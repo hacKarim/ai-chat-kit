@@ -64,7 +64,7 @@ const ThreadListSkeleton: FC = () => {
 const ThreadListItem: FC = () => {
   return (
     <ThreadListItemPrimitive.Root className="aui-thread-list-item group/archive flex items-center gap-2 rounded-lg transition-all hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-active:bg-muted">
-      <ThreadListItemPrimitive.Trigger className="aui-thread-list-item-trigger flex-grow px-3 py-2 text-start">
+      <ThreadListItemPrimitive.Trigger className="cursor-pointer aui-thread-list-item-trigger flex-grow px-3 py-2 text-start overflow-hidden">
         <ThreadListItemTitle />
       </ThreadListItemPrimitive.Trigger>
       <ThreadListItemDelete />
@@ -74,7 +74,7 @@ const ThreadListItem: FC = () => {
 
 const ThreadListItemTitle: FC = () => {
   return (
-    <span className="aui-thread-list-item-title text-sm">
+    <span className="aui-thread-list-item-title text-sm truncate block">
       <ThreadListItemPrimitive.Title />
     </span>
   );
@@ -84,7 +84,7 @@ const ThreadListItemDelete: FC = () => {
   return (
     <ThreadListItemPrimitive.Archive asChild>
       <TooltipIconButton
-        className="aui-thread-list-item-delete mr-3 ml-auto size-4 p-0 text-foreground opacity-0 transition-opacity group-hover/archive:opacity-100 hover:text-destructive"
+        className="aui-thread-list-item-delete mr-3 ml-auto size-4 p-0 text-foreground opacity-0 transition-opacity group-hover/archive:opacity-100 hover:text-destructive cursor-pointer"
         variant="ghost"
         tooltip="Delete conversation"
       >

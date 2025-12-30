@@ -39,7 +39,6 @@ export const useThreadKeyRegistry = () => {
     if (!threadKey || !threadListItem.id) return;
 
     // Register this association
-    console.log(`Registering thread ${threadListItem.id} with key:`, threadKey.substring(0, 50));
     threadIdToKeyMap.set(threadListItem.id, threadKey);
   }, [thread?.messages, threadListItem?.id, threadListItem?.isMain]);
 };

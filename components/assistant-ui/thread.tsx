@@ -21,7 +21,7 @@ import {
 } from "@assistant-ui/react";
 
 import type { FC } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LazyMotion, MotionConfig, domAnimation } from "motion/react";
 import * as m from "motion/react-m";
 
@@ -37,6 +37,7 @@ import {
 } from "@/components/assistant-ui/attachment";
 import { WorkflowStatus } from "@/components/workflow-status";
 import type { WorkflowState } from "@/lib/dify/types";
+import { getOrCreateSessionId } from "@/lib/session";
 
 import { cn } from "@/lib/utils";
 
@@ -98,6 +99,7 @@ const ThreadWelcome: FC = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
+            transition={{ delay: 0.5 }}
             className="aui-thread-welcome-message-motion-1 text-2xl font-semibold"
           >
             Hello there!
@@ -106,7 +108,7 @@ const ThreadWelcome: FC = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.6 }}
             className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
           >
             How can I help you today?
@@ -147,7 +149,7 @@ const ThreadSuggestions: FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          transition={{ delay: 0.05 * index }}
+          transition={{ delay: 0.5 + 0.05 * index }}
           key={`suggested-action-${suggestedAction.title}-${index}`}
           className="aui-thread-welcome-suggestion-display [&:nth-child(n+3)]:hidden @md:[&:nth-child(n+3)]:block"
         >
@@ -175,13 +177,164 @@ const ThreadSuggestions: FC = () => {
   );
 };
 
+const MessageSuggestions: FC<{
+  messageId?: string;
+  onSuggestionClick?: () => void;
+}> = ({ messageId, onSuggestionClick }) => {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!messageId) {
+      setSuggestions([]);
+      return;
+    }
+
+    const fetchSuggestions = async () => {
+      setIsLoading(true);
+      try {
+        const sessionId = getOrCreateSessionId();
+        const response = await fetch(`/api/suggestions/${messageId}`, {
+          headers: {
+            "X-Session-Id": sessionId,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestions(data.data || []);
+        } else {
+          console.error("Failed to fetch suggestions:", response.status);
+        }
+      } catch (error) {
+        console.error("Error fetching suggestions:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [messageId]);
+
+  const handleSuggestionClick = useCallback(() => {
+    setSuggestions([]);
+    onSuggestionClick?.();
+  }, [onSuggestionClick]);
+
+  if (isLoading || suggestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center flex-1">
+      {suggestions.map((suggestion, index) => (
+        <m.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ delay: 0.05 * index }}
+          key={`message-suggestion-${index}`}
+        >
+          <ThreadPrimitive.Suggestion
+            prompt={suggestion}
+            send
+            asChild
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-auto rounded-full px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm hover:bg-accent dark:hover:bg-accent/60 whitespace-nowrap cursor-pointer"
+              aria-label={suggestion}
+              onClick={handleSuggestionClick}
+            >
+              {suggestion}
+            </Button>
+          </ThreadPrimitive.Suggestion>
+        </m.div>
+      ))}
+    </div>
+  );
+};
+
 const Composer: FC = () => {
+  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [hasConversation, setHasConversation] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+
+  // Get the last assistant message ID from the thread
+  useEffect(() => {
+    const checkLastMessage = () => {
+      // Get conversation ID from URL
+      const pathParts = window.location.pathname.split('/');
+      const conversationIdFromUrl = pathParts[pathParts.length - 1];
+      const isValidConversationId = conversationIdFromUrl && conversationIdFromUrl !== '' && conversationIdFromUrl !== 'assistant';
+
+      // If conversation ID changed, reset suggestions
+      if (isValidConversationId && conversationIdFromUrl !== currentConversationId) {
+        setCurrentConversationId(conversationIdFromUrl);
+        setLastMessageId(null);
+        setShowSuggestions(true);
+      } else if (!isValidConversationId && currentConversationId !== null) {
+        // New conversation (no ID in URL)
+        setCurrentConversationId(null);
+        setLastMessageId(null);
+        setHasConversation(false);
+      }
+
+      // Query for all assistant messages
+      const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
+
+      // Only show suggestions if there's at least one assistant message (conversation started)
+      if (assistantMessages.length > 0) {
+        setHasConversation(true);
+        // Get the last assistant message
+        const lastAssistant = assistantMessages[assistantMessages.length - 1];
+        const messageId = lastAssistant.getAttribute('data-message-id');
+        if (messageId && messageId !== lastMessageId) {
+          setLastMessageId(messageId);
+          setShowSuggestions(true);
+        }
+      } else {
+        // No assistant messages yet - hide suggestions
+        setHasConversation(false);
+        setLastMessageId(null);
+      }
+    };
+
+    // Initial check
+    checkLastMessage();
+
+    // Set up observer to watch for new messages
+    const observer = new MutationObserver(checkLastMessage);
+    const viewport = document.querySelector('.aui-thread-viewport');
+    if (viewport) {
+      observer.observe(viewport, { childList: true, subtree: true });
+    }
+
+    // Listen for URL changes (when switching conversations)
+    const handleUrlChange = () => {
+      checkLastMessage();
+    };
+    window.addEventListener('popstate', handleUrlChange);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, [lastMessageId, currentConversationId]);
+
+  const handleSend = useCallback(() => {
+    setShowSuggestions(false);
+  }, []);
+
   return (
     <div className="aui-composer-wrapper sticky bottom-0 mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-4 md:pb-6">
       <ThreadScrollToBottom />
+
       <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
         <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone group/input-group flex w-full flex-col rounded-3xl border border-input bg-background px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-[3px] has-[textarea:focus-visible]:ring-ring/50 data-[dragging=true]:border-dashed data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 dark:bg-background">
           <ComposerAttachments />
+
           <ComposerPrimitive.Input
             placeholder="Send a message..."
             className="aui-composer-input mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-0"
@@ -189,14 +342,25 @@ const Composer: FC = () => {
             autoFocus
             aria-label="Message input"
           />
-          <ComposerAction />
+
+          {/* Suggestions between input and actions */}
+          {showSuggestions && lastMessageId && hasConversation && (
+            <div className="px-2 sm:px-3.5 pb-2">
+              <MessageSuggestions
+                messageId={lastMessageId}
+                onSuggestionClick={() => setShowSuggestions(false)}
+              />
+            </div>
+          )}
+
+          <ComposerAction onSend={handleSend} />
         </ComposerPrimitive.AttachmentDropzone>
       </ComposerPrimitive.Root>
     </div>
   );
 };
 
-const ComposerAction: FC = () => {
+const ComposerAction: FC<{ onSend?: () => void }> = ({ onSend }) => {
   return (
     <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-between">
       <ComposerAddAttachment />
@@ -211,6 +375,7 @@ const ComposerAction: FC = () => {
             size="icon"
             className="aui-composer-send size-[34px] rounded-full p-1"
             aria-label="Send message"
+            onClick={onSend}
           >
             <ArrowUpIcon className="aui-composer-send-icon size-5" />
           </TooltipIconButton>
@@ -247,6 +412,7 @@ const MessageError: FC = () => {
 const AssistantMessage: FC = () => {
   const message = useMessage();
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
+  const [difyMessageId, setDifyMessageId] = useState<string | null>(null);
 
   // Extract workflow events from message data parts
   useEffect(() => {
@@ -296,13 +462,32 @@ const AssistantMessage: FC = () => {
         };
       });
     }
-  }, [message?.content]);
+
+    // Extract Dify message ID from message data parts
+    const messageData = message.content.find(
+      (part: any) => part.type === "data" && part.data?.difyMessageId
+    );
+    if (messageData) {
+      setDifyMessageId((messageData as any).data.difyMessageId);
+    } else {
+      // Try to extract from message ID if it follows the pattern msg-{difyId}-assistant
+      const messageId = (message as any).id;
+      if (messageId && typeof messageId === "string") {
+        const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
+        if (match && match[1] && match[1].includes("-")) {
+          // If it looks like a UUID (contains hyphens), use it
+          setDifyMessageId(match[1]);
+        }
+      }
+    }
+  }, [message?.content, message]);
 
   return (
     <MessagePrimitive.Root asChild>
       <div
         className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
         data-role="assistant"
+        data-message-id={difyMessageId || undefined}
       >
         {/* Display workflow status if available */}
         {workflowState && (

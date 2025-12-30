@@ -51,7 +51,6 @@ export function ThreadProvider({
     setIsLoadingConversations(true);
     try {
       const userId = getOrCreateSessionId();
-      console.log("Loading conversations for user:", userId);
 
       const response = await fetch(
         `/api/conversations?user=${encodeURIComponent(userId)}&limit=50`
@@ -64,8 +63,6 @@ export function ThreadProvider({
         // Don't fail completely - just start with empty state
         // This is normal for new users who haven't created any conversations yet
         if (response.status === 404 || response.status === 400) {
-          console.log("No conversations found or user doesn't exist yet - starting fresh");
-
           // Create a new thread for the user
           const newThreadId = `thread-${Date.now()}`;
           const defaultThread: ThreadData = {
@@ -104,7 +101,6 @@ export function ThreadProvider({
 
       // If no conversations, create a new thread for the user
       if (conversations.length === 0) {
-        console.log("No existing conversations found - creating new thread");
         const newThreadId = `thread-${Date.now()}`;
         const defaultThread: ThreadData = {
           threadId: newThreadId,
@@ -164,8 +160,6 @@ export function ThreadProvider({
         setThreads(newThreads);
       }
       setCurrentThreadId(targetThreadId);
-
-      console.log(`✅ Successfully loaded ${conversations.length} conversations from Dify`);
     } catch (error) {
       console.error("Error loading conversations:", error);
       console.warn("Continuing with default state despite error");

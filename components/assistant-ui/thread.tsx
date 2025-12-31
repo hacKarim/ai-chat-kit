@@ -55,7 +55,6 @@ export const ListeningModeContext = createContext<{
 });
 
 import { Button } from "@/components/ui/button";
-import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TextWithImages } from "@/components/assistant-ui/text-with-images";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
@@ -74,11 +73,48 @@ import { MessageSources } from "@/components/assistant-ui/message-sources";
 
 import { cn } from "@/lib/utils";
 
-export const Thread: FC = () => {
+export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void }> = ({
+  onListeningModeChange
+}) => {
   const [isListeningMode, setIsListeningMode] = useState(false);
   const [currentlyPlayingMessageId, setCurrentlyPlayingMessageId] = useState<string | null>(null);
   const [lastAutoPlayedMessageId, setLastAutoPlayedMessageId] = useState<string | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastKnownMessageIdRef = useRef<string | null>(null);
+  const shouldStopPlaybackRef = useRef(false);
+
+  // Notify parent when listening mode changes
+  useEffect(() => {
+    if (onListeningModeChange) {
+      onListeningModeChange(isListeningMode);
+    }
+  }, [isListeningMode, onListeningModeChange]);
+
+  // Helper function to split text into chunks for TTS optimization
+  const splitIntoChunks = (text: string, maxChunkSize: number = 500): string[] => {
+    const chunks: string[] = [];
+
+    // Split by sentences first
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+
+    let currentChunk = '';
+    for (const sentence of sentences) {
+      // If adding this sentence would exceed max size, start new chunk
+      if (currentChunk.length + sentence.length > maxChunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+      } else {
+        currentChunk += sentence;
+      }
+    }
+
+    // Add remaining text
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  };
 
   // Centralized audio player functions
   const audioPlayer: AudioPlayerContextType = {
@@ -97,46 +133,121 @@ export const Thread: FC = () => {
       try {
         const sessionId = getOrCreateSessionId();
 
-        const response = await fetch("/api/text-to-audio", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Session-Id": sessionId,
-          },
-          body: JSON.stringify({
-            message_id: difyMessageId,
-            user: sessionId,
-          }),
-        });
+        // Get the message text content for chunking
+        const messageElement = document.querySelector(`[data-message-id="${difyMessageId}"]`);
+        const messageContent = messageElement?.querySelector('.aui-assistant-message-content');
+        const messageText = messageContent?.textContent?.trim() || '';
 
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({ error: "Unknown error" }));
-          throw new Error(error.error || "Failed to generate audio");
+        // Split into chunks if text is long (> 500 chars)
+        const shouldChunk = messageText.length > 500;
+        const chunks = shouldChunk ? splitIntoChunks(messageText) : [];
+
+        shouldStopPlaybackRef.current = false;
+
+        // If chunking, play chunks sequentially
+        if (shouldChunk && chunks.length > 0) {
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+
+            // Check if playback was stopped
+            if (shouldStopPlaybackRef.current) {
+              break;
+            }
+
+            const response = await fetch("/api/text-to-audio", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Session-Id": sessionId,
+              },
+              body: JSON.stringify({
+                text: chunk, // Send only text when chunking
+                user: sessionId,
+              }),
+            });
+
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({ error: "Unknown error" }));
+              throw new Error(error.error || "Failed to generate audio");
+            }
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            // Create and play audio for this chunk
+            const audio = new Audio(audioUrl);
+            currentAudioRef.current = audio;
+
+            // Wait for chunk to finish playing before continuing
+            await new Promise<void>((resolve, reject) => {
+              audio.onplay = () => {
+                setCurrentlyPlayingMessageId(messageId);
+              };
+
+              audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                resolve();
+              };
+
+              audio.onerror = () => {
+                URL.revokeObjectURL(audioUrl);
+                setCurrentlyPlayingMessageId(null);
+                currentAudioRef.current = null;
+                reject(new Error('Audio playback error'));
+              };
+
+              audio.play().catch(reject);
+            });
+          }
+        } else {
+          // For short messages, use message_id as before
+          const response = await fetch("/api/text-to-audio", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Session-Id": sessionId,
+            },
+            body: JSON.stringify({
+              message_id: difyMessageId,
+              user: sessionId,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: "Unknown error" }));
+            throw new Error(error.error || "Failed to generate audio");
+          }
+
+          const audioBlob = await response.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          const audio = new Audio(audioUrl);
+          currentAudioRef.current = audio;
+
+          audio.onplay = () => {
+            setCurrentlyPlayingMessageId(messageId);
+          };
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            setCurrentlyPlayingMessageId(null);
+            currentAudioRef.current = null;
+          };
+
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            setCurrentlyPlayingMessageId(null);
+            currentAudioRef.current = null;
+          };
+
+          await audio.play();
         }
 
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        const audio = new Audio(audioUrl);
-        currentAudioRef.current = audio;
-
-        audio.onplay = () => {
-          setCurrentlyPlayingMessageId(messageId);
-        };
-
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
+        // All chunks finished (only for chunked playback)
+        if (shouldChunk) {
           setCurrentlyPlayingMessageId(null);
           currentAudioRef.current = null;
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          setCurrentlyPlayingMessageId(null);
-          currentAudioRef.current = null;
-        };
-
-        await audio.play();
+        }
       } catch (error) {
         setCurrentlyPlayingMessageId(null);
         currentAudioRef.current = null;
@@ -145,6 +256,7 @@ export const Thread: FC = () => {
     },
 
     stop: () => {
+      shouldStopPlaybackRef.current = true;
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
@@ -152,6 +264,95 @@ export const Thread: FC = () => {
       setCurrentlyPlayingMessageId(null);
     },
   };
+
+  // Auto-play TTS when a NEW message completes streaming (for listening mode)
+  // Uses MutationObserver to detect when message ID attribute is added (streaming complete)
+  useEffect(() => {
+    // Early return if listening mode is not active
+    if (!isListeningMode) {
+      return;
+    }
+
+    // Check if audio is already playing
+    if (currentlyPlayingMessageId) {
+      return;
+    }
+
+    const tryAutoPlayNewMessage = () => {
+      // Query DOM for the last assistant message
+      const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
+
+      if (assistantMessages.length === 0) {
+        return;
+      }
+
+      const lastMessage = assistantMessages[assistantMessages.length - 1];
+      const difyMessageId = lastMessage.getAttribute('data-message-id');
+
+      // Only proceed if we have a dify message ID
+      if (!difyMessageId) {
+        return;
+      }
+
+      // Check if this is a NEW message (different from the last one we knew about)
+      const isNewMessage = difyMessageId !== lastKnownMessageIdRef.current;
+
+      // Update our tracking of the last known message
+      lastKnownMessageIdRef.current = difyMessageId;
+
+      // Only auto-play if this is a NEW message
+      if (!isNewMessage) {
+        return;
+      }
+
+      // Check if this message has already been auto-played (extra safety)
+      if (difyMessageId === lastAutoPlayedMessageId) {
+        return;
+      }
+
+      // Check if there's text content in the message (not empty)
+      const messageContent = lastMessage.querySelector('.aui-assistant-message-content');
+      if (!messageContent || messageContent.textContent?.trim() === '') {
+        return;
+      }
+
+      // Mark this message as auto-played and play immediately
+      setLastAutoPlayedMessageId(difyMessageId);
+
+      // Play audio immediately - no delay needed
+      audioPlayer.play(difyMessageId, difyMessageId).catch(() => {
+        // Silent error handling for auto-play
+      });
+    };
+
+    // Set up MutationObserver to watch for data-message-id attribute changes
+    const viewport = document.querySelector('.aui-thread-viewport');
+    if (!viewport) {
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      // Only trigger if we see a data-message-id attribute change
+      const hasMessageIdChange = mutations.some(mutation =>
+        mutation.type === 'attributes' &&
+        mutation.attributeName === 'data-message-id'
+      );
+
+      if (hasMessageIdChange) {
+        tryAutoPlayNewMessage();
+      }
+    });
+
+    observer.observe(viewport, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-message-id'],
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isListeningMode, currentlyPlayingMessageId, lastAutoPlayedMessageId, audioPlayer]);
 
   return (
     <LazyMotion features={domAnimation}>
@@ -181,28 +382,7 @@ export const Thread: FC = () => {
                 <div className="aui-thread-viewport-spacer min-h-8 grow" />
               </ThreadPrimitive.If>
 
-              <Composer
-                onMessageReceived={(messageId, difyMessageId) => {
-                  // Auto-play ONLY if:
-                  // 1. Listening mode is active
-                  // 2. This message hasn't been auto-played yet
-                  // 3. No audio is currently playing
-                  const shouldAutoPlay = isListeningMode &&
-                    messageId !== lastAutoPlayedMessageId &&
-                    !currentlyPlayingMessageId;
-
-                  if (shouldAutoPlay) {
-                    setLastAutoPlayedMessageId(messageId);
-
-                    // Small delay to ensure message is fully rendered
-                    setTimeout(() => {
-                      audioPlayer.play(messageId, difyMessageId).catch(() => {
-                        // Silent error handling for auto-play
-                      });
-                    }, 500);
-                  }
-                }}
-              />
+              <Composer />
             </ThreadPrimitive.Viewport>
           </ThreadPrimitive.Root>
           </ListeningModeContext.Provider>
@@ -359,7 +539,7 @@ const MessageSuggestions: FC<{
   }
 
   return (
-    <div className="flex flex-wrap gap-2 items-center flex-1">
+    <div className="flex gap-2 items-center flex-1 overflow-x-auto scrollbar-hide">
       {suggestions.map((suggestion, index) => (
         <m.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -389,9 +569,7 @@ const MessageSuggestions: FC<{
   );
 };
 
-const Composer: FC<{
-  onMessageReceived?: (messageId: string, difyMessageId: string) => void;
-}> = ({ onMessageReceived }) => {
+const Composer: FC = () => {
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [hasConversation, setHasConversation] = useState(false);
@@ -491,7 +669,6 @@ const Composer: FC<{
 
           <ComposerInnerAction
             onSend={handleSend}
-            onMessageReceived={onMessageReceived}
           />
         </ComposerPrimitive.AttachmentDropzone>
       </ComposerPrimitive.Root>
@@ -501,8 +678,7 @@ const Composer: FC<{
 
 const ComposerInnerAction: FC<{
   onSend?: () => void;
-  onMessageReceived?: (messageId: string, difyMessageId: string) => void;
-}> = ({ onSend, onMessageReceived }) => {
+}> = ({ onSend }) => {
   // Get the thread runtime to append messages
   const threadRuntime = useThreadRuntime();
 
@@ -510,10 +686,11 @@ const ComposerInnerAction: FC<{
   const thread = useThread();
   const isRunning = thread.isRunning;
 
+  // Get audio player from context
+  const audioPlayer = useContext(AudioPlayerContext);
+
   // Store transcribed text temporarily
   const transcribedTextRef = useRef<string>("");
-  const pendingMessageIdRef = useRef<string | null>(null);
-  const pendingDifyMessageIdRef = useRef<string | null>(null);
 
   const handleTranscription = useCallback((text: string) => {
     if (text) {
@@ -521,37 +698,6 @@ const ComposerInnerAction: FC<{
       transcribedTextRef.current = text;
     }
   }, []);
-
-  // Watch for new assistant messages and notify
-  useEffect(() => {
-    const checkForNewMessage = () => {
-      // Query for the last assistant message
-      const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
-
-      if (assistantMessages.length === 0) return;
-
-      const lastMessage = assistantMessages[assistantMessages.length - 1];
-      const messageId = lastMessage.getAttribute('data-message-id');
-
-      // If we have a pending message and we find a new assistant message with a dify ID
-      if (pendingMessageIdRef.current && messageId && messageId !== pendingDifyMessageIdRef.current) {
-        pendingDifyMessageIdRef.current = messageId;
-
-        // Notify parent with both message ID and dify message ID
-        if (onMessageReceived) {
-          onMessageReceived(pendingMessageIdRef.current, messageId);
-        }
-
-        // Clear pending
-        pendingMessageIdRef.current = null;
-      }
-    };
-
-    // Set up interval to check for new messages
-    const intervalId = setInterval(checkForNewMessage, 200);
-
-    return () => clearInterval(intervalId);
-  }, [onMessageReceived]);
 
   const handleAutoSend = useCallback(() => {
     // Auto-send the transcribed text using the thread runtime
@@ -565,10 +711,6 @@ const ComposerInnerAction: FC<{
 
       // Clear the transcribed text
       transcribedTextRef.current = "";
-
-      // Generate a unique message ID for tracking
-      const newMessageId = `msg-${Date.now()}-assistant`;
-      pendingMessageIdRef.current = newMessageId;
 
       // Use the thread runtime to append the message
       // This will trigger the onNew handler in assistant.tsx
@@ -596,7 +738,9 @@ const ComposerInnerAction: FC<{
         <VoiceRecorder
           onTranscription={handleTranscription}
           onAutoSend={handleAutoSend}
+          onRecordingStart={audioPlayer.stop}
           isThreadRunning={isRunning}
+          isAudioPlaying={!!audioPlayer.currentlyPlayingMessageId}
         />
 
         <ThreadPrimitive.If running={false}>
@@ -802,10 +946,10 @@ const TextToSpeechButton: FC = () => {
     return null;
   })();
 
-  const isPlaying = audioPlayer.isPlaying(messageId);
+  const isPlaying = audioPlayer.isPlaying(difyMessageId);
 
   const handlePlayAudio = async () => {
-    if (!messageId || !difyMessageId) {
+    if (!difyMessageId) {
       return;
     }
 
@@ -822,7 +966,7 @@ const TextToSpeechButton: FC = () => {
 
     setIsLoading(true);
     try {
-      await audioPlayer.play(messageId, difyMessageId);
+      await audioPlayer.play(difyMessageId, difyMessageId);
     } catch (error) {
       // Silent error handling
     } finally {

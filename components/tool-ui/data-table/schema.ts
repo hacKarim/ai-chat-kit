@@ -4,10 +4,30 @@ export interface StatusConfig {
 }
 
 export interface ColumnFormat {
-  kind: "text" | "status" | "date" | "boolean" | "number";
+  kind: "text" | "status" | "date" | "boolean" | "number" | "delta" | "link" | "badge" | "array";
+
+  // Status format
   statusMap?: Record<string, StatusConfig>;
+
+  // Date format
   dateFormat?: "short" | "long" | "relative";
+
+  // Number format
   numberFormat?: "integer" | "decimal" | "currency" | "percentage";
+
+  // Delta format (for change indicators)
+  deltaColors?: { positive?: string; negative?: string; neutral?: string };
+  showSign?: boolean;
+
+  // Link format
+  linkTarget?: "_blank" | "_self";
+
+  // Badge format
+  badgeColorMap?: Record<string, string>;
+
+  // Array format
+  maxVisibleItems?: number;
+  separator?: string;
 }
 
 export interface Column {

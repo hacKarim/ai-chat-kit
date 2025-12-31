@@ -5,10 +5,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { FileText, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RetrieverResource } from "@/lib/dify/types";
@@ -53,8 +55,8 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
   const hasMore = uniqueSources.length > 5;
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
         <Button
           variant="outline"
           size="sm"
@@ -96,16 +98,14 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
             {uniqueSources.length} {uniqueSources.length === 1 ? 'Source' : 'Sources'}
           </span>
         </Button>
-      </PopoverTrigger>
+      </SheetTrigger>
 
-      <PopoverContent
-        className="w-[400px] max-h-[500px] overflow-y-auto p-3"
-        align="start"
-        side="top"
-      >
-        <div className="space-y-3">
-          <h4 className="font-semibold text-sm mb-2">Sources</h4>
+      <SheetContent side="right" className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Sources ({uniqueSources.length})</SheetTitle>
+        </SheetHeader>
 
+        <div className="space-y-3 p-4">
           {uniqueSources.map((source, index) => (
             <div
               key={`${source.document_id}-${index}`}
@@ -173,7 +173,7 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
             </div>
           ))}
         </div>
-      </PopoverContent>
-    </Popover>
+      </SheetContent>
+    </Sheet>
   );
 };

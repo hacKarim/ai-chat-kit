@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 export type RecordingState = "idle" | "listening" | "recording" | "processing";
 
-export function useVoiceRecorder() {
+export function useVoiceRecorder(onVoiceDetected?: () => void) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -219,7 +219,13 @@ export function useVoiceRecorder() {
   // VAD: Start auto-recording when voice is detected
   const startListeningMode = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
 
       // Set up audio context for VAD
@@ -256,6 +262,11 @@ export function useVoiceRecorder() {
 
         // Voice detected - start recording if not already recording
         if (audioLevel > VOICE_THRESHOLD && isListeningActiveRef.current && !isRecordingFromVADRef.current) {
+          // Notify that voice was detected (for stopping audio playback)
+          if (onVoiceDetected) {
+            onVoiceDetected();
+          }
+
           isRecordingFromVADRef.current = true;
           silenceScheduledRef.current = false; // Reset silence flag when starting new recording
 

@@ -8,15 +8,19 @@ import { ListeningModeContext } from "@/components/assistant-ui/thread";
 interface VoiceRecorderProps {
   onTranscription: (text: string) => void;
   onAutoSend?: () => void; // Callback to trigger LLM send
+  onRecordingStart?: () => void; // Callback when user starts talking
   disabled?: boolean;
   isThreadRunning?: boolean; // Whether the LLM is currently responding
+  isAudioPlaying?: boolean; // Whether TTS audio is currently playing
 }
 
 export const VoiceRecorder: FC<VoiceRecorderProps> = ({
   onTranscription,
   onAutoSend,
+  onRecordingStart,
   disabled = false,
   isThreadRunning = false,
+  isAudioPlaying = false,
 }) => {
   const {
     recordingState,
@@ -29,7 +33,12 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
     pauseListening,
     resumeListening,
     hasRecording,
-  } = useVoiceRecorder();
+  } = useVoiceRecorder(() => {
+    // Called when VAD detects voice - stop audio immediately if playing
+    if (isAudioPlaying && onRecordingStart) {
+      onRecordingStart();
+    }
+  });
 
   const [recordingDuration, setRecordingDuration] = useState(0);
   const sendOnStopRef = useRef(false);
@@ -60,17 +69,35 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
   }, [recordingState, setIsListeningMode]);
 
   // Pause/resume listening based on thread running state
+  // NOTE: We keep VAD active during audio playback so it can detect interruptions
   useEffect(() => {
     if (recordingState === "listening") {
       if (isThreadRunning) {
-        // LLM is responding, pause VAD monitoring
+        // LLM is responding (streaming), pause VAD monitoring
         pauseListening();
       } else {
         // LLM finished, resume VAD monitoring
+        // VAD will remain active even during audio playback to detect user interruptions
         resumeListening();
       }
     }
   }, [isThreadRunning, recordingState, pauseListening, resumeListening]);
+
+  // Stop audio immediately when recording starts
+  useEffect(() => {
+    if (recordingState === "recording" && isAudioPlaying && onRecordingStart) {
+      // Recording started while audio was playing - stop the audio immediately
+      onRecordingStart();
+    }
+  }, [recordingState, isAudioPlaying, onRecordingStart]);
+
+  // Also stop audio when VAD detects voice in listening mode (backup)
+  useEffect(() => {
+    if (recordingState === "listening" && hasRecording && isAudioPlaying && onRecordingStart) {
+      // VAD detected voice while audio was playing - stop the audio immediately
+      onRecordingStart();
+    }
+  }, [recordingState, hasRecording, isAudioPlaying, onRecordingStart]);
 
   // Auto-send after stopping recording
   useEffect(() => {
@@ -124,6 +151,10 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
       isListeningModeRef.current = true;
       sendOnStopRef.current = true;
       try {
+        // Stop any playing audio when user starts listening mode
+        if (onRecordingStart) {
+          onRecordingStart();
+        }
         await startListeningMode();
       } catch (error) {
         alert("Failed to access microphone. Please check permissions.");
@@ -160,6 +191,10 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
     if (recordingState === "idle") {
       // Start regular recording
       try {
+        // Stop any playing audio when user starts recording
+        if (onRecordingStart) {
+          onRecordingStart();
+        }
         await startRecording();
       } catch (error) {
         alert("Failed to access microphone. Please check permissions.");

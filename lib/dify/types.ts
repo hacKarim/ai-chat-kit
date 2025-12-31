@@ -3,7 +3,7 @@
  */
 
 export type NodeStatus = "pending" | "in_progress" | "completed" | "failed" | "cancelled";
-export type WorkflowStatus = "idle" | "running" | "succeeded" | "failed" | "stopped";
+export type WorkflowStatus = "idle" | "running" | "succeeded" | "failed" | "stopped" | "canceled";
 
 export interface WorkflowNode {
   id: string;
@@ -11,6 +11,25 @@ export interface WorkflowNode {
   type?: string;
   status: NodeStatus;
   elapsedTime?: number;
+  error?: string | null;
+  inputs?: Record<string, any>;
+  outputs?: Record<string, any>;
+  executionMetadata?: {
+    total_tokens?: number;
+    total_price?: string;
+    currency?: string;
+    error_strategy?: string;
+  };
+  processData?: {
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+      total_price?: string;
+      currency?: string;
+      latency?: number;
+    };
+  };
 }
 
 export interface WorkflowState {

@@ -4,7 +4,8 @@ import {
   ThreadListPrimitive,
   useAssistantState,
 } from "@assistant-ui/react";
-import { PlusIcon, XIcon } from "lucide-react";
+import { PlusIcon, XIcon, LayoutDashboard } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
@@ -13,9 +14,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const ThreadList: FC = () => {
   return (
     <ThreadListPrimitive.Root className="aui-root aui-thread-list-root flex flex-col items-stretch gap-1.5">
+      <DashboardButton />
       <ThreadListNew />
       <ThreadListItems />
     </ThreadListPrimitive.Root>
+  );
+};
+
+const DashboardButton: FC = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const isActive = pathname === "/dashboard";
+
+  const handleClick = () => {
+    if (pathname !== "/dashboard") {
+      router.push("/dashboard", { scroll: false });
+    }
+  };
+
+  return (
+    <Button
+      className="flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start hover:bg-muted data-active:bg-muted"
+      variant="ghost"
+      onClick={handleClick}
+      data-active={isActive ? "" : undefined}
+    >
+      <LayoutDashboard className="size-4" />
+      Dashboard
+    </Button>
   );
 };
 

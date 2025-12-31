@@ -51,6 +51,22 @@
       background-position: -100% 0;
     }
   }
+  @keyframes shimmer {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes plan-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }
 
 :root {
@@ -137,5 +153,32 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 40%,
+      currentColor 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-text 3s linear infinite;
+  }
+
+  @keyframes shimmer-text {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 }

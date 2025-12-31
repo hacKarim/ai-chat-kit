@@ -8,8 +8,10 @@ import {
   unstable_memoizeMarkdownComponents as memoizeMarkdownComponents,
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
+import { useThreadRuntime } from "@assistant-ui/react";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import ReactMarkdown from "react-markdown";
 import { type FC, memo, useState } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { visit } from "unist-util-visit";
@@ -27,18 +29,23 @@ import { LinkedInPost, parseSerializableLinkedInPost } from "@/components/tool-u
 import { DataTable, parseSerializableDataTable } from "@/components/tool-ui/data-table";
 import { OptionList, parseSerializableOptionList } from "@/components/tool-ui/option-list";
 import { ItemCarousel, parseSerializableItemCarousel } from "@/components/tool-ui/item-carousel";
+import { Chart, parseSerializableChart } from "@/components/tool-ui/chart";
+import { LinkPreview, parseSerializableLinkPreview } from "@/components/tool-ui/link-preview";
+import { Plan, parseSerializablePlan } from "@/components/tool-ui/plan";
+import { Image, parseSerializableImage } from "@/components/tool-ui/image";
 
 // Remark plugin to transform social post code blocks
 const remarkSocialPosts: Plugin = () => {
   return (tree: any) => {
-    visit(tree, "code", (node: any, index: number, parent: any) => {
+    visit(tree, "code", (node: any, index: number | undefined, parent: any) => {
       const language = node.lang;
       const socialPostTypes = [
         'x-post', 'twitter-post', 'instagram-post', 'linkedin-post',
-        'data-table', 'option-list', 'item-carousel'
+        'data-table', 'option-list', 'item-carousel',
+        'chart', 'link-preview', 'plan', 'image'
       ];
 
-      if (socialPostTypes.includes(language)) {
+      if (socialPostTypes.includes(language) && index !== undefined && parent) {
         // Replace the code node with a custom HTML node
         // Use btoa for browser compatibility instead of Buffer
         const encodedContent = btoa(encodeURIComponent(node.value));
@@ -52,27 +59,37 @@ const remarkSocialPosts: Plugin = () => {
   };
 };
 
+// Preprocess markdown to unescape any escaped backticks
+const preprocessMarkdown = (text: string): string => {
+  // Unescape backticks that were escaped in JSON responses
+  return text.replace(/\\`/g, '`');
+};
+
 const MarkdownTextImpl = ({ text }: { text?: string }) => {
-  // If text prop is provided, use it directly
-  // Otherwise, MarkdownTextPrimitive will get text from MessagePrimitive context
+  // If text prop is provided, use ReactMarkdown directly
   if (text !== undefined) {
+    const processedText = preprocessMarkdown(text);
     return (
-      <MarkdownTextPrimitive
-        text={text}
-        remarkPlugins={[remarkGfm, remarkSocialPosts]}
-        rehypePlugins={[rehypeRaw]}
-        className="aui-md"
-        components={defaultComponents}
-      />
+      <div className="aui-md">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkSocialPosts]}
+          rehypePlugins={[rehypeRaw as any]}
+          components={defaultComponents as any}
+        >
+          {processedText}
+        </ReactMarkdown>
+      </div>
     );
   }
 
+  // Otherwise, get text from context using MarkdownTextPrimitive
   return (
     <MarkdownTextPrimitive
       remarkPlugins={[remarkGfm, remarkSocialPosts]}
       rehypePlugins={[rehypeRaw]}
       className="aui-md"
       components={defaultComponents}
+      preprocess={preprocessMarkdown}
     />
   );
 };
@@ -118,8 +135,39 @@ const useCopyToClipboard = ({
   return { isCopied, copyToClipboard };
 };
 
+// Wrapper component for OptionList that connects to the conversation
+const InteractiveOptionList: FC<{ data: any }> = ({ data }) => {
+  const threadRuntime = useThreadRuntime();
+  const optionList = parseSerializableOptionList(data);
+
+  const handleConfirm = (selection: string | string[]) => {
+    // Format the selection as a message
+    let message: string;
+    if (Array.isArray(selection)) {
+      // Multiple selections
+      const selectedOptions = optionList.options
+        .filter(opt => selection.includes(opt.id))
+        .map(opt => opt.label);
+      message = selectedOptions.join(", ");
+    } else {
+      // Single selection
+      const selectedOption = optionList.options.find(opt => opt.id === selection);
+      message = selectedOption?.label || selection;
+    }
+
+    // Send the message to the conversation
+    threadRuntime.append({
+      role: "user",
+      content: [{ type: "text", text: message }],
+    });
+  };
+
+  return <OptionList {...optionList} onConfirm={handleConfirm} />;
+};
+
 const defaultComponents = memoizeMarkdownComponents({
   // Custom renderer for social post blocks
+  // @ts-ignore - custom HTML element from remark plugin
   "social-post-block": function SocialPostBlockRenderer(props: any) {
     const type = props['data-type'];
     const encodedContent = props['data-content'];
@@ -169,10 +217,9 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'option-list':
-          const optionList = parseSerializableOptionList(data);
           return (
             <div className="not-prose my-4">
-              <OptionList {...optionList} />
+              <InteractiveOptionList data={data} />
             </div>
           );
 
@@ -181,6 +228,38 @@ const defaultComponents = memoizeMarkdownComponents({
           return (
             <div className="not-prose my-4">
               <ItemCarousel {...carousel} />
+            </div>
+          );
+
+        case 'chart':
+          const chart = parseSerializableChart(data);
+          return (
+            <div className="not-prose my-4">
+              <Chart {...chart} />
+            </div>
+          );
+
+        case 'link-preview':
+          const linkPreview = parseSerializableLinkPreview(data);
+          return (
+            <div className="not-prose my-4">
+              <LinkPreview {...linkPreview} />
+            </div>
+          );
+
+        case 'plan':
+          const plan = parseSerializablePlan(data);
+          return (
+            <div className="not-prose my-4">
+              <Plan {...plan} />
+            </div>
+          );
+
+        case 'image':
+          const image = parseSerializableImage(data);
+          return (
+            <div className="not-prose my-4">
+              <Image {...image} />
             </div>
           );
 
@@ -329,7 +408,7 @@ const defaultComponents = memoizeMarkdownComponents({
   pre: ({ className, ...props }) => (
     <pre
       className={cn(
-        "aui-md-pre overflow-x-auto !rounded-t-none rounded-b-lg bg-black p-4 text-white",
+        "aui-md-pre overflow-x-auto  rounded-b-lg  p-4",
         className,
       )}
       {...props}

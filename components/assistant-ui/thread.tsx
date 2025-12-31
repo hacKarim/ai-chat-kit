@@ -8,6 +8,9 @@ import {
   PencilIcon,
   RefreshCwIcon,
   Square,
+  Volume2,
+  Loader2,
+  StopCircle,
 } from "lucide-react";
 
 import {
@@ -18,15 +21,42 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useMessage,
+  useThreadRuntime,
+  useThread,
 } from "@assistant-ui/react";
 
 import type { FC } from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import { LazyMotion, MotionConfig, domAnimation } from "motion/react";
 import * as m from "motion/react-m";
 
+// Centralized Audio Player Context - Single source of truth for all audio playback
+interface AudioPlayerContextType {
+  currentlyPlayingMessageId: string | null;
+  isPlaying: (messageId: string) => boolean;
+  play: (messageId: string, difyMessageId: string) => Promise<void>;
+  stop: () => void;
+}
+
+const AudioPlayerContext = createContext<AudioPlayerContextType>({
+  currentlyPlayingMessageId: null,
+  isPlaying: () => false,
+  play: async () => {},
+  stop: () => {},
+});
+
+// Context for tracking listening mode - EXPORTED for use in VoiceRecorder
+export const ListeningModeContext = createContext<{
+  isListeningMode: boolean;
+  setIsListeningMode: (value: boolean) => void;
+}>({
+  isListeningMode: false,
+  setIsListeningMode: () => {},
+});
+
 import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
+import { TextWithImages } from "@/components/assistant-ui/text-with-images";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
@@ -35,42 +65,148 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { WorkflowStreamButton } from "@/components/assistant-ui/workflow-stream";
 import { WorkflowStatus } from "@/components/workflow-status";
-import type { WorkflowState } from "@/lib/dify/types";
+import type { WorkflowState, RetrieverResource } from "@/lib/dify/types";
 import { getOrCreateSessionId } from "@/lib/session";
+import { VoiceRecorder } from "@/components/assistant-ui/voice-recorder";
+import { MessageSources } from "@/components/assistant-ui/message-sources";
 
 import { cn } from "@/lib/utils";
 
 export const Thread: FC = () => {
+  const [isListeningMode, setIsListeningMode] = useState(false);
+  const [currentlyPlayingMessageId, setCurrentlyPlayingMessageId] = useState<string | null>(null);
+  const [lastAutoPlayedMessageId, setLastAutoPlayedMessageId] = useState<string | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Centralized audio player functions
+  const audioPlayer: AudioPlayerContextType = {
+    currentlyPlayingMessageId,
+
+    isPlaying: (messageId: string) => currentlyPlayingMessageId === messageId,
+
+    play: async (messageId: string, difyMessageId: string) => {
+      // Stop any currently playing audio first
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+        setCurrentlyPlayingMessageId(null);
+      }
+
+      try {
+        const sessionId = getOrCreateSessionId();
+
+        const response = await fetch("/api/text-to-audio", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Session-Id": sessionId,
+          },
+          body: JSON.stringify({
+            message_id: difyMessageId,
+            user: sessionId,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(error.error || "Failed to generate audio");
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        const audio = new Audio(audioUrl);
+        currentAudioRef.current = audio;
+
+        audio.onplay = () => {
+          setCurrentlyPlayingMessageId(messageId);
+        };
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setCurrentlyPlayingMessageId(null);
+          currentAudioRef.current = null;
+        };
+
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          setCurrentlyPlayingMessageId(null);
+          currentAudioRef.current = null;
+        };
+
+        await audio.play();
+      } catch (error) {
+        setCurrentlyPlayingMessageId(null);
+        currentAudioRef.current = null;
+        throw error;
+      }
+    },
+
+    stop: () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      setCurrentlyPlayingMessageId(null);
+    },
+  };
+
   return (
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
-        <ThreadPrimitive.Root
-          className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
-          style={{
-            ["--thread-max-width" as string]: "44rem",
-          }}
-        >
-          <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
-            <ThreadPrimitive.If empty>
-              <ThreadWelcome />
-            </ThreadPrimitive.If>
+        <AudioPlayerContext.Provider value={audioPlayer}>
+          <ListeningModeContext.Provider value={{ isListeningMode, setIsListeningMode }}>
+          <ThreadPrimitive.Root
+            className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
+            style={{
+              ["--thread-max-width" as string]: "44rem",
+            }}
+          >
+            <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
+              <ThreadPrimitive.If empty>
+                <ThreadWelcome />
+              </ThreadPrimitive.If>
 
-            <ThreadPrimitive.Messages
-              components={{
-                UserMessage,
-                EditComposer,
-                AssistantMessage,
-              }}
-            />
+              <ThreadPrimitive.Messages
+                components={{
+                  UserMessage,
+                  EditComposer,
+                  AssistantMessage,
+                }}
+              />
 
-            <ThreadPrimitive.If empty={false}>
-              <div className="aui-thread-viewport-spacer min-h-8 grow" />
-            </ThreadPrimitive.If>
+              <ThreadPrimitive.If empty={false}>
+                <div className="aui-thread-viewport-spacer min-h-8 grow" />
+              </ThreadPrimitive.If>
 
-            <Composer />
-          </ThreadPrimitive.Viewport>
-        </ThreadPrimitive.Root>
+              <Composer
+                onMessageReceived={(messageId, difyMessageId) => {
+                  // Auto-play ONLY if:
+                  // 1. Listening mode is active
+                  // 2. This message hasn't been auto-played yet
+                  // 3. No audio is currently playing
+                  const shouldAutoPlay = isListeningMode &&
+                    messageId !== lastAutoPlayedMessageId &&
+                    !currentlyPlayingMessageId;
+
+                  if (shouldAutoPlay) {
+                    setLastAutoPlayedMessageId(messageId);
+
+                    // Small delay to ensure message is fully rendered
+                    setTimeout(() => {
+                      audioPlayer.play(messageId, difyMessageId).catch(() => {
+                        // Silent error handling for auto-play
+                      });
+                    }, 500);
+                  }
+                }}
+              />
+            </ThreadPrimitive.Viewport>
+          </ThreadPrimitive.Root>
+          </ListeningModeContext.Provider>
+        </AudioPlayerContext.Provider>
       </MotionConfig>
     </LazyMotion>
   );
@@ -202,11 +338,9 @@ const MessageSuggestions: FC<{
         if (response.ok) {
           const data = await response.json();
           setSuggestions(data.data || []);
-        } else {
-          console.error("Failed to fetch suggestions:", response.status);
         }
       } catch (error) {
-        console.error("Error fetching suggestions:", error);
+        // Silent error handling
       } finally {
         setIsLoading(false);
       }
@@ -255,7 +389,9 @@ const MessageSuggestions: FC<{
   );
 };
 
-const Composer: FC = () => {
+const Composer: FC<{
+  onMessageReceived?: (messageId: string, difyMessageId: string) => void;
+}> = ({ onMessageReceived }) => {
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [hasConversation, setHasConversation] = useState(false);
@@ -353,48 +489,147 @@ const Composer: FC = () => {
             </div>
           )}
 
-          <ComposerAction onSend={handleSend} />
+          <ComposerInnerAction
+            onSend={handleSend}
+            onMessageReceived={onMessageReceived}
+          />
         </ComposerPrimitive.AttachmentDropzone>
       </ComposerPrimitive.Root>
     </div>
   );
 };
 
-const ComposerAction: FC<{ onSend?: () => void }> = ({ onSend }) => {
+const ComposerInnerAction: FC<{
+  onSend?: () => void;
+  onMessageReceived?: (messageId: string, difyMessageId: string) => void;
+}> = ({ onSend, onMessageReceived }) => {
+  // Get the thread runtime to append messages
+  const threadRuntime = useThreadRuntime();
+
+  // Get thread state to check if running
+  const thread = useThread();
+  const isRunning = thread.isRunning;
+
+  // Store transcribed text temporarily
+  const transcribedTextRef = useRef<string>("");
+  const pendingMessageIdRef = useRef<string | null>(null);
+  const pendingDifyMessageIdRef = useRef<string | null>(null);
+
+  const handleTranscription = useCallback((text: string) => {
+    if (text) {
+      // Store the transcribed text for auto-send
+      transcribedTextRef.current = text;
+    }
+  }, []);
+
+  // Watch for new assistant messages and notify
+  useEffect(() => {
+    const checkForNewMessage = () => {
+      // Query for the last assistant message
+      const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
+
+      if (assistantMessages.length === 0) return;
+
+      const lastMessage = assistantMessages[assistantMessages.length - 1];
+      const messageId = lastMessage.getAttribute('data-message-id');
+
+      // If we have a pending message and we find a new assistant message with a dify ID
+      if (pendingMessageIdRef.current && messageId && messageId !== pendingDifyMessageIdRef.current) {
+        pendingDifyMessageIdRef.current = messageId;
+
+        // Notify parent with both message ID and dify message ID
+        if (onMessageReceived) {
+          onMessageReceived(pendingMessageIdRef.current, messageId);
+        }
+
+        // Clear pending
+        pendingMessageIdRef.current = null;
+      }
+    };
+
+    // Set up interval to check for new messages
+    const intervalId = setInterval(checkForNewMessage, 200);
+
+    return () => clearInterval(intervalId);
+  }, [onMessageReceived]);
+
+  const handleAutoSend = useCallback(() => {
+    // Auto-send the transcribed text using the thread runtime
+    // Small delay to ensure transcription is complete
+    setTimeout(() => {
+      const message = transcribedTextRef.current.trim();
+
+      if (!message) {
+        return;
+      }
+
+      // Clear the transcribed text
+      transcribedTextRef.current = "";
+
+      // Generate a unique message ID for tracking
+      const newMessageId = `msg-${Date.now()}-assistant`;
+      pendingMessageIdRef.current = newMessageId;
+
+      // Use the thread runtime to append the message
+      // This will trigger the onNew handler in assistant.tsx
+      threadRuntime.append({
+        role: "user",
+        content: [{ type: "text", text: message }],
+      });
+    }, 100);
+
+    // Also call the onSend callback if provided
+    if (onSend) {
+      onSend();
+    }
+  }, [threadRuntime, onSend]);
+
   return (
     <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-between">
-      <ComposerAddAttachment />
+      <div className="flex items-center gap-2">
+        <ComposerAddAttachment />
+        <WorkflowStreamButton />
+      </div>
 
-      <ThreadPrimitive.If running={false}>
-        <ComposerPrimitive.Send asChild>
-          <TooltipIconButton
-            tooltip="Send message"
-            side="bottom"
-            type="submit"
-            variant="default"
-            size="icon"
-            className="aui-composer-send size-[34px] rounded-full p-1"
-            aria-label="Send message"
-            onClick={onSend}
-          >
-            <ArrowUpIcon className="aui-composer-send-icon size-5" />
-          </TooltipIconButton>
-        </ComposerPrimitive.Send>
-      </ThreadPrimitive.If>
+      <div className="flex items-center gap-2">
+        {/* Keep VoiceRecorder mounted, but pass running state to pause/resume */}
+        <VoiceRecorder
+          onTranscription={handleTranscription}
+          onAutoSend={handleAutoSend}
+          isThreadRunning={isRunning}
+        />
 
-      <ThreadPrimitive.If running>
-        <ComposerPrimitive.Cancel asChild>
-          <Button
-            type="button"
-            variant="default"
-            size="icon"
-            className="aui-composer-cancel size-[34px] rounded-full border border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90"
-            aria-label="Stop generating"
-          >
-            <Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
-          </Button>
-        </ComposerPrimitive.Cancel>
-      </ThreadPrimitive.If>
+        <ThreadPrimitive.If running={false}>
+          <ComposerPrimitive.Send asChild>
+            <TooltipIconButton
+              tooltip="Send message"
+              side="bottom"
+              type="submit"
+              variant="default"
+              size="icon"
+              className="aui-composer-send size-[34px] rounded-full p-1"
+              aria-label="Send message"
+              onClick={onSend}
+            >
+              <ArrowUpIcon className="aui-composer-send-icon size-5" />
+            </TooltipIconButton>
+          </ComposerPrimitive.Send>
+        </ThreadPrimitive.If>
+
+        <ThreadPrimitive.If running>
+          <ComposerPrimitive.Cancel asChild>
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              className="aui-composer-cancel size-[34px] rounded-full border border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90"
+              aria-label="Stop generating"
+            >
+              <Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
+            </Button>
+          </ComposerPrimitive.Cancel>
+        </ThreadPrimitive.If>
+      </div>
     </div>
   );
 };
@@ -413,6 +648,7 @@ const AssistantMessage: FC = () => {
   const message = useMessage();
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [difyMessageId, setDifyMessageId] = useState<string | null>(null);
+  const [sources, setSources] = useState<RetrieverResource[] | null>(null);
 
   // Extract workflow events from message data parts
   useEffect(() => {
@@ -480,6 +716,17 @@ const AssistantMessage: FC = () => {
         }
       }
     }
+
+    // Extract retriever resources from message data parts
+    const sourcesData = message.content.find(
+      (part: any) => part.type === "data" && part.data?.retrieverResources
+    );
+    if (sourcesData) {
+      const retrieverResources = (sourcesData as any).data.retrieverResources;
+      setSources(retrieverResources);
+    } else {
+      setSources(null);
+    }
   }, [message?.content, message]);
 
   return (
@@ -499,7 +746,7 @@ const AssistantMessage: FC = () => {
         <div className="aui-assistant-message-content mx-2 leading-7 break-words text-foreground">
           <MessagePrimitive.Parts
             components={{
-              Text: MarkdownText,
+              Text: TextWithImages,
               Reasoning: Reasoning,
               ReasoningGroup: ReasoningGroup,
               tools: { Fallback: ToolFallback },
@@ -508,12 +755,106 @@ const AssistantMessage: FC = () => {
           <MessageError />
         </div>
 
-        <div className="aui-assistant-message-footer mt-2 ml-2 flex">
-          <BranchPicker />
-          <AssistantActionBar />
+        <div className="aui-assistant-message-footer mt-2 ml-2 flex flex-col gap-2">
+          {/* Sources display - before action bar */}
+          {sources && sources.length > 0 && (
+            <div className="flex items-center">
+              <MessageSources sources={sources} />
+            </div>
+          )}
+
+          <div className="flex items-center">
+            <BranchPicker />
+            <AssistantActionBar />
+          </div>
         </div>
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+const TextToSpeechButton: FC = () => {
+  const message = useMessage();
+  const audioPlayer = useContext(AudioPlayerContext);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Extract message IDs
+  const messageId = (message as any)?.id || null;
+  const difyMessageId = (() => {
+    if (!message?.content) return null;
+
+    const messageData = message.content.find(
+      (part: any) => part.type === "data" && part.data?.difyMessageId
+    );
+
+    if (messageData) {
+      return (messageData as any).data.difyMessageId;
+    }
+
+    // Try to extract from message ID if it follows the pattern msg-{difyId}-assistant
+    if (messageId && typeof messageId === "string") {
+      const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
+      if (match && match[1] && match[1].includes("-")) {
+        return match[1];
+      }
+    }
+
+    return null;
+  })();
+
+  const isPlaying = audioPlayer.isPlaying(messageId);
+
+  const handlePlayAudio = async () => {
+    if (!messageId || !difyMessageId) {
+      return;
+    }
+
+    // If already playing this message, stop it
+    if (isPlaying) {
+      audioPlayer.stop();
+      return;
+    }
+
+    // If loading, ignore
+    if (isLoading) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await audioPlayer.play(messageId, difyMessageId);
+    } catch (error) {
+      // Silent error handling
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Don't show button if no message ID
+  if (!difyMessageId) {
+    return null;
+  }
+
+  return (
+    <TooltipIconButton
+      tooltip={
+        isLoading
+          ? "Loading audio..."
+          : isPlaying
+            ? "Stop audio"
+            : "Play audio"
+      }
+      onClick={handlePlayAudio}
+      className={isPlaying ? "text-blue-500 hover:text-blue-600" : ""}
+    >
+      {isLoading ? (
+        <Loader2 className="animate-spin" />
+      ) : isPlaying ? (
+        <StopCircle className="fill-current" />
+      ) : (
+        <Volume2 />
+      )}
+    </TooltipIconButton>
   );
 };
 
@@ -525,6 +866,7 @@ const AssistantActionBar: FC = () => {
       autohideFloat="single-branch"
       className="aui-assistant-action-bar-root col-start-3 row-start-2 -ml-1 flex gap-1 text-muted-foreground data-floating:absolute data-floating:rounded-md data-floating:border data-floating:bg-background data-floating:p-1 data-floating:shadow-sm"
     >
+      <TextToSpeechButton />
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip="Copy">
           <MessagePrimitive.If copied>

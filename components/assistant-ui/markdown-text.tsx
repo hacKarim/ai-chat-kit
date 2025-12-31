@@ -9,16 +9,68 @@ import {
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { type FC, memo, useState } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
+import { visit } from "unist-util-visit";
+import type { Plugin } from "unified";
 
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { cn } from "@/lib/utils";
 
-const MarkdownTextImpl = () => {
+// Import social post components
+import { XPost, parseSerializableXPost } from "@/components/tool-ui/x-post";
+import { InstagramPost, parseSerializableInstagramPost } from "@/components/tool-ui/instagram-post";
+import { LinkedInPost, parseSerializableLinkedInPost } from "@/components/tool-ui/linkedin-post";
+
+// Import tool-ui components
+import { DataTable, parseSerializableDataTable } from "@/components/tool-ui/data-table";
+import { OptionList, parseSerializableOptionList } from "@/components/tool-ui/option-list";
+import { ItemCarousel, parseSerializableItemCarousel } from "@/components/tool-ui/item-carousel";
+
+// Remark plugin to transform social post code blocks
+const remarkSocialPosts: Plugin = () => {
+  return (tree: any) => {
+    visit(tree, "code", (node: any, index: number, parent: any) => {
+      const language = node.lang;
+      const socialPostTypes = [
+        'x-post', 'twitter-post', 'instagram-post', 'linkedin-post',
+        'data-table', 'option-list', 'item-carousel'
+      ];
+
+      if (socialPostTypes.includes(language)) {
+        // Replace the code node with a custom HTML node
+        // Use btoa for browser compatibility instead of Buffer
+        const encodedContent = btoa(encodeURIComponent(node.value));
+
+        parent.children[index] = {
+          type: 'html',
+          value: `<social-post-block data-type="${language}" data-content="${encodedContent}"></social-post-block>`,
+        };
+      }
+    });
+  };
+};
+
+const MarkdownTextImpl = ({ text }: { text?: string }) => {
+  // If text prop is provided, use it directly
+  // Otherwise, MarkdownTextPrimitive will get text from MessagePrimitive context
+  if (text !== undefined) {
+    return (
+      <MarkdownTextPrimitive
+        text={text}
+        remarkPlugins={[remarkGfm, remarkSocialPosts]}
+        rehypePlugins={[rehypeRaw]}
+        className="aui-md"
+        components={defaultComponents}
+      />
+    );
+  }
+
   return (
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkSocialPosts]}
+      rehypePlugins={[rehypeRaw]}
       className="aui-md"
       components={defaultComponents}
     />
@@ -67,6 +119,78 @@ const useCopyToClipboard = ({
 };
 
 const defaultComponents = memoizeMarkdownComponents({
+  // Custom renderer for social post blocks
+  "social-post-block": function SocialPostBlockRenderer(props: any) {
+    const type = props['data-type'];
+    const encodedContent = props['data-content'];
+
+    if (!type || !encodedContent) {
+      return null;
+    }
+
+    try {
+      // Decode the content
+      const content = decodeURIComponent(atob(encodedContent));
+      const data = JSON.parse(content);
+
+      // Render based on type
+      switch (type) {
+        case 'x-post':
+        case 'twitter-post':
+          const xPost = parseSerializableXPost(data);
+          return (
+            <div className="not-prose my-4">
+              <XPost post={xPost} />
+            </div>
+          );
+
+        case 'instagram-post':
+          const igPost = parseSerializableInstagramPost(data);
+          return (
+            <div className="not-prose my-4">
+              <InstagramPost post={igPost} />
+            </div>
+          );
+
+        case 'linkedin-post':
+          const liPost = parseSerializableLinkedInPost(data);
+          return (
+            <div className="not-prose my-4">
+              <LinkedInPost post={liPost} />
+            </div>
+          );
+
+        case 'data-table':
+          const dataTable = parseSerializableDataTable(data);
+          return (
+            <div className="not-prose my-4">
+              <DataTable {...dataTable} />
+            </div>
+          );
+
+        case 'option-list':
+          const optionList = parseSerializableOptionList(data);
+          return (
+            <div className="not-prose my-4">
+              <OptionList {...optionList} />
+            </div>
+          );
+
+        case 'item-carousel':
+          const carousel = parseSerializableItemCarousel(data);
+          return (
+            <div className="not-prose my-4">
+              <ItemCarousel {...carousel} />
+            </div>
+          );
+
+        default:
+          return null;
+      }
+    } catch (error) {
+      return null;
+    }
+  },
   h1: ({ className, ...props }) => (
     <h1
       className={cn(
@@ -124,7 +248,7 @@ const defaultComponents = memoizeMarkdownComponents({
   p: ({ className, ...props }) => (
     <p
       className={cn(
-        "aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0",
+        "aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0 rounded-2xl overflow-hidden",
         className,
       )}
       {...props}

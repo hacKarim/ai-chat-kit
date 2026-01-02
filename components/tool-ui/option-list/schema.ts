@@ -19,9 +19,15 @@ export interface SerializableOptionList {
 }
 
 export function parseSerializableOptionList(data: any): SerializableOptionList {
+  // Auto-generate IDs for options if not provided
+  const options = (data.options || []).map((option: any) => ({
+    ...option,
+    id: option.id || crypto.randomUUID(),
+  }));
+
   return {
     id: data.id || crypto.randomUUID(),
-    options: data.options || [],
+    options,
     selectionMode: data.selectionMode || "multiple",
     minSelections: data.minSelections,
     maxSelections: data.maxSelections,

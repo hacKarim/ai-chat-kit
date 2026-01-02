@@ -49,7 +49,7 @@ export const LinkedInPost: FC<LinkedInPostProps> = ({
 
   return (
     <div className={cn("w-full max-w-[540px]", className)}>
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-none">
         {/* Header */}
         <div className="p-4">
           <div className="flex items-start gap-3 mb-3">

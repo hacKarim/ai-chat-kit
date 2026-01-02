@@ -47,14 +47,26 @@ export interface SerializableDataTable {
   compact?: boolean;
 }
 
-export function parseSerializableDataTable(data: any): SerializableDataTable {
+export function parseSerializableDataTable(input: any): SerializableDataTable {
+  // Support both 'data' and 'rows' field names
+  const tableData = input.data || input.rows || [];
+
+  // Support both 'caption' and 'title' field names
+  const caption = input.caption || input.title;
+
+  // Auto-generate IDs for rows if not provided
+  const dataWithIds = tableData.map((row: any) => ({
+    ...row,
+    id: row.id || crypto.randomUUID(),
+  }));
+
   return {
-    id: data.id || crypto.randomUUID(),
-    columns: data.columns || [],
-    data: data.data || [],
-    rowIdKey: data.rowIdKey || "id",
-    caption: data.caption,
-    striped: data.striped ?? true,
-    compact: data.compact ?? false,
+    id: input.id || crypto.randomUUID(),
+    columns: input.columns || [],
+    data: dataWithIds,
+    rowIdKey: input.rowIdKey || "id",
+    caption,
+    striped: input.striped ?? true,
+    compact: input.compact ?? false,
   };
 }

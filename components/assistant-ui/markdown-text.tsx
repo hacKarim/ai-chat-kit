@@ -8,7 +8,7 @@ import {
   unstable_memoizeMarkdownComponents as memoizeMarkdownComponents,
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
-import { useThreadRuntime } from "@assistant-ui/react";
+import { useThreadRuntime, useMessage } from "@assistant-ui/react";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import ReactMarkdown from "react-markdown";
@@ -33,6 +33,11 @@ import { Chart, parseSerializableChart } from "@/components/tool-ui/chart";
 import { LinkPreview, parseSerializableLinkPreview } from "@/components/tool-ui/link-preview";
 import { Plan, parseSerializablePlan } from "@/components/tool-ui/plan";
 import { Image, parseSerializableImage } from "@/components/tool-ui/image";
+import { Maps, parseSerializableMaps } from "@/components/tool-ui/maps";
+import { Dashboard, parseSerializableDashboard } from "@/components/tool-ui/dashboard";
+import { FileDownload, parseSerializableFileDownload } from "@/components/tool-ui/file-download";
+import { RecordButton, parseSerializableRecordButton } from "@/components/tool-ui/record-button";
+import { NextBestAction, parseSerializableNextBestAction } from "@/components/tool-ui/next-best-action";
 
 // Remark plugin to transform social post code blocks
 const remarkSocialPosts: Plugin = () => {
@@ -42,7 +47,8 @@ const remarkSocialPosts: Plugin = () => {
       const socialPostTypes = [
         'x-post', 'twitter-post', 'instagram-post', 'linkedin-post',
         'data-table', 'option-list', 'item-carousel',
-        'chart', 'link-preview', 'plan', 'image'
+        'chart', 'link-preview', 'plan', 'image', 'maps', 'dashboard', 'file-download',
+        'record-button', 'next-best-action'
       ];
 
       if (socialPostTypes.includes(language) && index !== undefined && parent) {
@@ -165,6 +171,46 @@ const InteractiveOptionList: FC<{ data: any }> = ({ data }) => {
   return <OptionList {...optionList} onConfirm={handleConfirm} />;
 };
 
+// Wrapper component for RecordButton that connects to the conversation
+const InteractiveRecordButton: FC<{ data: any }> = ({ data }) => {
+  const threadRuntime = useThreadRuntime();
+  const recordButton = parseSerializableRecordButton(data);
+  const message = useMessage();
+
+  // Check if this is the last message in the thread
+  const thread = threadRuntime.getState();
+  const messages = thread.messages;
+  const currentMessageId = message?.id;
+  const currentMessageIndex = messages.findIndex((msg) => msg.id === currentMessageId);
+  const isLastMessage = currentMessageIndex === messages.length - 1;
+
+  const handleTranscript = (transcript: string) => {
+    // Send the transcript to the conversation
+    threadRuntime.append({
+      role: "user",
+      content: [{ type: "text", text: transcript }],
+    });
+  };
+
+  return <RecordButton {...recordButton} onTranscript={handleTranscript} isActive={isLastMessage} />;
+};
+
+// Wrapper component for NextBestAction that connects to the conversation
+const InteractiveNextBestAction: FC<{ data: any }> = ({ data }) => {
+  const threadRuntime = useThreadRuntime();
+  const nextBestAction = parseSerializableNextBestAction(data);
+
+  const handleActionClick = (prompt: string) => {
+    // Send the prompt to the conversation
+    threadRuntime.append({
+      role: "user",
+      content: [{ type: "text", text: prompt }],
+    });
+  };
+
+  return <NextBestAction {...nextBestAction} onActionClick={handleActionClick} />;
+};
+
 const defaultComponents = memoizeMarkdownComponents({
   // Custom renderer for social post blocks
   // @ts-ignore - custom HTML element from remark plugin
@@ -260,6 +306,44 @@ const defaultComponents = memoizeMarkdownComponents({
           return (
             <div className="not-prose my-4">
               <Image {...image} />
+            </div>
+          );
+
+        case 'maps':
+          const maps = parseSerializableMaps(data);
+          return (
+            <div className="not-prose my-4">
+              <Maps {...maps} />
+            </div>
+          );
+
+        case 'dashboard':
+          const dashboard = parseSerializableDashboard(data);
+          return (
+            <div className="not-prose my-4">
+              <Dashboard {...dashboard} />
+            </div>
+          );
+
+        case 'file-download':
+          const fileDownload = parseSerializableFileDownload(data);
+          return (
+            <div className="not-prose my-4">
+              <FileDownload {...fileDownload} />
+            </div>
+          );
+
+        case 'record-button':
+          return (
+            <div className="not-prose my-4">
+              <InteractiveRecordButton data={data} />
+            </div>
+          );
+
+        case 'next-best-action':
+          return (
+            <div className="not-prose my-4">
+              <InteractiveNextBestAction data={data} />
             </div>
           );
 

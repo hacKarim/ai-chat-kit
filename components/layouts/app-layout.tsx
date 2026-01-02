@@ -31,7 +31,7 @@ interface AppLayoutProps {
 export function AppLayout({
   children,
   breadcrumbTitle,
-  breadcrumbLink = "/dashboard",
+  breadcrumbLink = "/home",
 }: AppLayoutProps) {
   return (
     <SidebarProvider>

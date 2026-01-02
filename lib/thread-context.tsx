@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { ThreadMessageLike } from "@assistant-ui/react";
 import { getOrCreateSessionId } from "./session";
 
@@ -41,9 +41,12 @@ export function ThreadProvider({
   const [threads, setThreads] = useState<Map<string, ThreadData>>(new Map());
   const [currentThreadId, setCurrentThreadId] = useState<string>("");
   const [isLoadingConversations, setIsLoadingConversations] = useState(true); // Start as true since we load on mount
+  const hasInitialized = useRef(false);
 
   // Load conversations from Dify on mount
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
     loadConversationsFromDify();
   }, []);
 

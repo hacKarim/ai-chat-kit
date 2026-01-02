@@ -210,7 +210,7 @@ export function WorkflowStatus({ workflowState }: WorkflowStatusProps) {
                   const isRunning = node.status === "in_progress";
 
                   return (
-                    <li key={node.id} className={cn("-mx-2 flex flex-col gap-2 rounded-md px-2 py-2", hasError && "bg-red-50 dark:bg-red-950/20")}>
+                    <li key={node.id} className={cn("-mx-2 flex flex-col gap-2 rounded-md px-2 py-1", hasError && "bg-red-50 dark:bg-red-950/20")}>
                       {/* Node header */}
                       <div className="flex items-start gap-2">
                         <span className={cn("mt-0.5 inline-flex shrink-0", isRunning && "motion-safe:animate-[plan-spin_8s_linear_infinite]")}>

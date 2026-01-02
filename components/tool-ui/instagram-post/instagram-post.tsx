@@ -63,7 +63,7 @@ export const InstagramPost: FC<InstagramPostProps> = ({
 
   return (
     <div className={cn("w-full max-w-[540px]", className)}>
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-none">
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b border-border">
           <div className="flex items-center gap-3">

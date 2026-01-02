@@ -21,12 +21,12 @@ export function parseSerializableInstagramPost(data: unknown): InstagramPostData
 
   const post = data as any;
 
-  if (!post.id || !post.author) {
-    throw new Error("Instagram post must have id and author");
+  if (!post.author) {
+    throw new Error("Instagram post must have author");
   }
 
   return {
-    id: String(post.id),
+    id: post.id ? String(post.id) : crypto.randomUUID(),
     author: {
       name: String(post.author.name),
       handle: String(post.author.handle),

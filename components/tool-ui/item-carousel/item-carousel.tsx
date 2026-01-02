@@ -36,7 +36,7 @@ export const ItemCarousel: FC<ItemCarouselProps> = ({
   return (
     <div
       className={cn(
-        "grid auto-cols-max grid-flow-col gap-4 overflow-x-auto overscroll-x-contain p-4 snap-x snap-mandatory",
+        "grid auto-cols-max grid-flow-col gap-4 overflow-x-auto overscroll-x-contain p-0 snap-x snap-mandatory",
         className
       )}
       role="list"
@@ -93,7 +93,7 @@ const ItemCard: FC<ItemCardProps> = ({ item, onItemClick, onItemAction }) => {
       <div
         data-slot="card"
         className={cn(
-          "bg-card text-card-foreground border shadow-sm",
+          "bg-card text-card-foreground border shadow-none",
           "group @container/card relative flex w-44 flex-col gap-0 self-stretch overflow-clip rounded-md p-0",
           "@lg:w-56",
           onItemClick && "cursor-pointer hover:shadow focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none touch-manipulation"

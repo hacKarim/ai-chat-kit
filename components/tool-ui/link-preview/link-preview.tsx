@@ -36,7 +36,7 @@ export const LinkPreview: FC<LinkPreviewProps> = ({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="bg-card text-card-foreground border shadow-sm group block rounded-xl overflow-hidden hover:shadow-md transition-all"
+        className="bg-card text-card-foreground border shadow-none group block rounded-xl overflow-hidden hover:shadow-none transition-all"
       >
         {/* Preview Image */}
         {image && (

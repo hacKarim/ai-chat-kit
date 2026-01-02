@@ -19,9 +19,15 @@ export interface SerializableItemCarousel {
 }
 
 export function parseSerializableItemCarousel(data: any): SerializableItemCarousel {
+  // Auto-generate IDs for items if not provided
+  const items = (data.items || []).map((item: any) => ({
+    ...item,
+    id: item.id || crypto.randomUUID(),
+  }));
+
   return {
     id: data.id || crypto.randomUUID(),
-    items: data.items || [],
+    items,
     loop: data.loop ?? true,
     autoPlay: data.autoPlay ?? false,
     autoPlayInterval: data.autoPlayInterval ?? 3000,

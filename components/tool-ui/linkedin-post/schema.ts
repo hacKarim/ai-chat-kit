@@ -21,12 +21,12 @@ export function parseSerializableLinkedInPost(data: unknown): LinkedInPostData {
 
   const post = data as any;
 
-  if (!post.id || !post.author) {
-    throw new Error("LinkedIn post must have id and author");
+  if (!post.author) {
+    throw new Error("LinkedIn post must have author");
   }
 
   return {
-    id: String(post.id),
+    id: post.id ? String(post.id) : crypto.randomUUID(),
     author: {
       name: String(post.author.name),
       avatarUrl: String(post.author.avatarUrl),

@@ -23,12 +23,12 @@ export function parseSerializableXPost(data: unknown): XPostData {
 
   const post = data as any;
 
-  if (!post.id || !post.author) {
-    throw new Error("X post must have id and author");
+  if (!post.author) {
+    throw new Error("X post must have author");
   }
 
   return {
-    id: String(post.id),
+    id: post.id ? String(post.id) : crypto.randomUUID(),
     author: {
       name: String(post.author.name),
       handle: String(post.author.handle),

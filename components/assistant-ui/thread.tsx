@@ -70,6 +70,7 @@ import type { WorkflowState, RetrieverResource } from "@/lib/dify/types";
 import { getOrCreateSessionId } from "@/lib/session";
 import { VoiceRecorder } from "@/components/assistant-ui/voice-recorder";
 import { MessageSources } from "@/components/assistant-ui/message-sources";
+import { VoiceRecorderProvider, useVoiceRecorderContext } from "@/contexts/voice-recorder-context";
 
 import { cn } from "@/lib/utils";
 
@@ -215,6 +216,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
 
           if (!response.ok) {
             const error = await response.json().catch(() => ({ error: "Unknown error" }));
+            console.error('[AUDIO] TTS API error:', response.status, error);
             throw new Error(error.error || "Failed to generate audio");
           }
 
@@ -357,8 +359,16 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
   return (
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
-        <AudioPlayerContext.Provider value={audioPlayer}>
-          <ListeningModeContext.Provider value={{ isListeningMode, setIsListeningMode }}>
+        <VoiceRecorderProvider
+          onVoiceDetected={() => {
+            // Called when VAD detects voice - stop audio immediately if playing
+            if (currentlyPlayingMessageId) {
+              audioPlayer.stop();
+            }
+          }}
+        >
+          <AudioPlayerContext.Provider value={audioPlayer}>
+            <ListeningModeContext.Provider value={{ isListeningMode, setIsListeningMode }}>
           <ThreadPrimitive.Root
             className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
             style={{
@@ -387,6 +397,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
           </ThreadPrimitive.Root>
           </ListeningModeContext.Provider>
         </AudioPlayerContext.Provider>
+        </VoiceRecorderProvider>
       </MotionConfig>
     </LazyMotion>
   );
@@ -441,24 +452,24 @@ const ThreadSuggestions: FC = () => {
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 pb-4 @md:grid-cols-2">
       {[
         {
-          title: "What's the weather",
-          label: "in San Francisco?",
-          action: "What's the weather in San Francisco?",
+          title: "Help answering",
+          label: "a client question",
+          action: "I need help answering a client",
         },
         {
-          title: "Explain React hooks",
-          label: "like useState and useEffect",
-          action: "Explain React hooks like useState and useEffect",
+          title: "Launch training",
+          label: "session on products",
+          action: "Launch a training session",
         },
         {
-          title: "Write a SQL query",
-          label: "to find top customers",
-          action: "Write a SQL query to find top customers",
+          title: "Prepare for",
+          label: "my next meeting",
+          action: "Prepare for my next meeting",
         },
         {
-          title: "Create a meal plan",
-          label: "for healthy weight loss",
-          action: "Create a meal plan for healthy weight loss",
+          title: "Review client",
+          label: "visit schedule",
+          action: "What are my upcoming client visits?",
         },
       ].map((suggestedAction, index) => (
         <m.div
@@ -474,18 +485,20 @@ const ThreadSuggestions: FC = () => {
             send
             asChild
           >
-            <Button
-              variant="ghost"
-              className="aui-thread-welcome-suggestion h-auto w-full flex-1 flex-wrap items-start justify-start gap-1 rounded-3xl border px-5 py-4 text-left text-sm @md:flex-col dark:hover:bg-accent/60"
+            <button
+              style={{ backgroundColor: '#EFF2F5' }}
+              className="group relative flex w-full h-[-webkit-fill-available] cursor-pointer rounded-3xl text-left transition-all duration-300 ease-in-out hover:brightness-95 min-h-[140px] flex-col items-start justify-between px-6 py-8"
               aria-label={suggestedAction.action}
             >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium">
-                {suggestedAction.title}
-              </span>
-              <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground">
-                {suggestedAction.label}
-              </span>
-            </Button>
+              <div className="flex flex-col gap-1">
+                <span className="text-lg font-semibold">
+                  {suggestedAction.title}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {suggestedAction.label}
+                </span>
+              </div>
+            </button>
           </ThreadPrimitive.Suggestion>
         </m.div>
       ))}
@@ -575,67 +588,78 @@ const Composer: FC = () => {
   const [hasConversation, setHasConversation] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
-  // Get the last assistant message ID from the thread
+  // Get thread state directly from assistant-ui runtime (no DOM polling!)
+  const thread = useThread();
+  const messages = thread.messages;
+
+  // Get the last assistant message ID from the thread state
   useEffect(() => {
-    const checkLastMessage = () => {
-      // Get conversation ID from URL
+    // Get conversation ID from URL
+    const pathParts = window.location.pathname.split('/');
+    const conversationIdFromUrl = pathParts[pathParts.length - 1];
+    const isValidConversationId = conversationIdFromUrl && conversationIdFromUrl !== '' && conversationIdFromUrl !== 'assistant';
+
+    // If conversation ID changed, reset suggestions
+    if (isValidConversationId && conversationIdFromUrl !== currentConversationId) {
+      setCurrentConversationId(conversationIdFromUrl);
+      setLastMessageId(null);
+      setShowSuggestions(true);
+    } else if (!isValidConversationId && currentConversationId !== null) {
+      // New conversation (no ID in URL)
+      setCurrentConversationId(null);
+      setLastMessageId(null);
+      setHasConversation(false);
+    }
+
+    // Get assistant messages from thread state (no DOM queries!)
+    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+
+    // Only show suggestions if there's at least one assistant message (conversation started)
+    if (assistantMessages.length > 0) {
+      setHasConversation(true);
+      // Get the last assistant message
+      const lastAssistant = assistantMessages[assistantMessages.length - 1];
+      const messageId = lastAssistant.id;
+
+      // Check if it's a dify message ID in the content
+      let difyMessageId: string | undefined;
+      if (Array.isArray(lastAssistant.content)) {
+        const dataPart = lastAssistant.content.find((part: any) =>
+          part.type === 'data' && part.data?.difyMessageId
+        ) as any;
+        difyMessageId = dataPart?.data?.difyMessageId;
+      }
+
+      const finalMessageId = difyMessageId || messageId;
+
+      if (finalMessageId && finalMessageId !== lastMessageId) {
+        setLastMessageId(finalMessageId);
+        setShowSuggestions(true);
+      }
+    } else {
+      // No assistant messages yet - hide suggestions
+      setHasConversation(false);
+      setLastMessageId(null);
+    }
+  }, [messages, currentConversationId, lastMessageId]);
+
+  // Listen for URL changes (when switching conversations)
+  useEffect(() => {
+    const handleUrlChange = () => {
       const pathParts = window.location.pathname.split('/');
       const conversationIdFromUrl = pathParts[pathParts.length - 1];
       const isValidConversationId = conversationIdFromUrl && conversationIdFromUrl !== '' && conversationIdFromUrl !== 'assistant';
 
-      // If conversation ID changed, reset suggestions
       if (isValidConversationId && conversationIdFromUrl !== currentConversationId) {
         setCurrentConversationId(conversationIdFromUrl);
         setLastMessageId(null);
         setShowSuggestions(true);
-      } else if (!isValidConversationId && currentConversationId !== null) {
-        // New conversation (no ID in URL)
-        setCurrentConversationId(null);
-        setLastMessageId(null);
-        setHasConversation(false);
-      }
-
-      // Query for all assistant messages
-      const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
-
-      // Only show suggestions if there's at least one assistant message (conversation started)
-      if (assistantMessages.length > 0) {
-        setHasConversation(true);
-        // Get the last assistant message
-        const lastAssistant = assistantMessages[assistantMessages.length - 1];
-        const messageId = lastAssistant.getAttribute('data-message-id');
-        if (messageId && messageId !== lastMessageId) {
-          setLastMessageId(messageId);
-          setShowSuggestions(true);
-        }
-      } else {
-        // No assistant messages yet - hide suggestions
-        setHasConversation(false);
-        setLastMessageId(null);
       }
     };
 
-    // Initial check
-    checkLastMessage();
-
-    // Set up observer to watch for new messages
-    const observer = new MutationObserver(checkLastMessage);
-    const viewport = document.querySelector('.aui-thread-viewport');
-    if (viewport) {
-      observer.observe(viewport, { childList: true, subtree: true });
-    }
-
-    // Listen for URL changes (when switching conversations)
-    const handleUrlChange = () => {
-      checkLastMessage();
-    };
     window.addEventListener('popstate', handleUrlChange);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('popstate', handleUrlChange);
-    };
-  }, [lastMessageId, currentConversationId]);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, [currentConversationId]);
 
   const handleSend = useCallback(() => {
     setShowSuggestions(false);
@@ -651,27 +675,79 @@ const Composer: FC = () => {
 
           <ComposerPrimitive.Input
             placeholder="Send a message..."
-            className="aui-composer-input mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+            className="aui-composer-input max-h-32 min-h-12 w-full resize-none bg-transparent px-3.5 pt-1.5  text-base outline-none placeholder:text-muted-foreground focus-visible:ring-0"
             rows={1}
             autoFocus
             aria-label="Message input"
           />
 
           {/* Suggestions between input and actions */}
-          {showSuggestions && lastMessageId && hasConversation && (
-            <div className="px-2 sm:px-3.5 pb-2">
-              <MessageSuggestions
-                messageId={lastMessageId}
-                onSuggestionClick={() => setShowSuggestions(false)}
-              />
-            </div>
-          )}
+          <ComposerSuggestions
+            showSuggestions={showSuggestions}
+            lastMessageId={lastMessageId}
+            hasConversation={hasConversation}
+            onSuggestionClick={() => setShowSuggestions(false)}
+          />
 
           <ComposerInnerAction
             onSend={handleSend}
           />
         </ComposerPrimitive.AttachmentDropzone>
       </ComposerPrimitive.Root>
+    </div>
+  );
+};
+
+const ComposerSuggestions: FC<{
+  showSuggestions: boolean;
+  lastMessageId: string | null;
+  hasConversation: boolean;
+  onSuggestionClick: () => void;
+}> = ({ showSuggestions, lastMessageId, hasConversation, onSuggestionClick }) => {
+  const [hasInputText, setHasInputText] = useState(false);
+  const [hasAttachments, setHasAttachments] = useState(false);
+
+  // Get thread state to check if running
+  const thread = useThread();
+  const isRunning = thread.isRunning;
+
+  // Get recording state from voice recorder context
+  const { recordingState } = useVoiceRecorderContext();
+  const isRecording = recordingState === 'recording' || recordingState === 'listening' || recordingState === 'processing';
+
+  // Poll the input value and attachments to check state (non-intrusive approach)
+  useEffect(() => {
+    const checkComposerState = () => {
+      // Check input text
+      const input = document.querySelector('.aui-composer-input') as HTMLTextAreaElement;
+      if (input) {
+        setHasInputText(input.value.trim().length > 0);
+      }
+
+      // Check attachments
+      const attachmentsList = document.querySelector('.aui-composer-attachments');
+      setHasAttachments(!!attachmentsList && attachmentsList.children.length > 0);
+    };
+
+    // Check immediately
+    checkComposerState();
+
+    // Poll every 200ms
+    const interval = setInterval(checkComposerState, 200);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!showSuggestions || !lastMessageId || !hasConversation || isRunning || isRecording || hasInputText || hasAttachments) {
+    return null;
+  }
+
+  return (
+    <div className="px-2 sm:px-3.5 pb-2">
+      <MessageSuggestions
+        messageId={lastMessageId}
+        onSuggestionClick={onSuggestionClick}
+      />
     </div>
   );
 };

@@ -47,7 +47,7 @@ export const XPost: FC<XPostProps> = ({
 
   return (
     <div className={cn("w-full max-w-[540px]", className)}>
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-none">
         <PostContent post={post} formatDate={formatDate} formatNumber={formatNumber} onAction={onAction} />
       </div>
 

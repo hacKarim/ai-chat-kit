@@ -45,13 +45,13 @@ export const Plan: FC<PlanProps> = ({
   const getStatusIcon = (status: PlanTodo["status"]) => {
     switch (status) {
       case "completed":
-        return <Check className="w-5 h-5 text-green-600" />;
+        return <Check className="w-4 h-4 text-green-600" />;
       case "in_progress":
-        return <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />;
       case "cancelled":
-        return <X className="w-5 h-5 text-gray-400" />;
+        return <X className="w-4 h-4 text-gray-400" />;
       default:
-        return <Circle className="w-5 h-5 text-gray-300" />;
+        return <Circle className="w-4 h-4 text-gray-300" />;
     }
   };
 
@@ -70,40 +70,40 @@ export const Plan: FC<PlanProps> = ({
 
   return (
     <div
-      className={cn("bg-card text-card-foreground border shadow-sm rounded-lg p-6 space-y-4", className)}
+      className={cn(" bg-card/60 text-card-foreground border border-border/50 rounded-lg p-4 space-y-3", className)}
       data-tool-ui-id={id}
       data-slot="plan"
     >
       {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-4">
+      <div className="space-y-1.5">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
-            <h3 className="text-xl font-semibold">{title}</h3>
+            <h3 className="text-lg font-semibold">{title}</h3>
             {description && (
-              <p className="text-sm text-muted-foreground mt-1">{description}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
             )}
           </div>
           {allCompleted && (
-            <PartyPopper className="w-6 h-6 text-yellow-500 flex-shrink-0" />
+            <PartyPopper className="w-5 h-5 text-yellow-500 flex-shrink-0" />
           )}
         </div>
 
         {/* Progress Bar */}
         {showProgress && (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-sm">
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-muted-foreground">Progress</span>
               <span className="font-medium">
-                {completedCount} / {todos.length} {allCompleted && "✓"}
+                {completedCount} of {todos.length} complete {allCompleted && "✓"}
               </span>
             </div>
-            <Progress value={progressPercentage} className="h-2" />
+            <Progress value={progressPercentage} className="h-1.5" />
           </div>
         )}
       </div>
 
       {/* Todo List */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {visibleTodos.map((todo) => {
           const isExpanded = expandedTodos.has(todo.id);
           const hasDescription = Boolean(todo.description);
@@ -111,43 +111,36 @@ export const Plan: FC<PlanProps> = ({
           return (
             <div
               key={todo.id}
-              className={cn(
-                "border rounded-lg p-3 transition-colors",
-                todo.status === "completed" && "bg-green-50/50 dark:bg-green-950/10",
-                todo.status === "in_progress" && "bg-blue-50/50 dark:bg-blue-950/10",
-                todo.status === "cancelled" && "bg-gray-50/50 dark:bg-gray-950/10"
-              )}
+              className="flex items-start gap-2.5 py-1.5"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">{getStatusIcon(todo.status)}</div>
-                <div className="flex-1 min-w-0">
-                  <div
-                    className={cn(
-                      "font-medium",
-                      getStatusColor(todo.status),
-                      hasDescription && "cursor-pointer"
-                    )}
-                    onClick={hasDescription ? () => toggleTodoExpanded(todo.id) : undefined}
-                  >
-                    {todo.label}
-                  </div>
-                  {hasDescription && isExpanded && (
-                    <p className="text-sm text-muted-foreground mt-2">{todo.description}</p>
+              <div className="flex-shrink-0 mt-0.5">{getStatusIcon(todo.status)}</div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className={cn(
+                    "text-sm",
+                    getStatusColor(todo.status),
+                    hasDescription && "cursor-pointer hover:underline"
                   )}
+                  onClick={hasDescription ? () => toggleTodoExpanded(todo.id) : undefined}
+                >
+                  {todo.label}
                 </div>
-                {hasDescription && (
-                  <button
-                    onClick={() => toggleTodoExpanded(todo.id)}
-                    className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
+                {hasDescription && isExpanded && (
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{todo.description}</p>
                 )}
               </div>
+              {hasDescription && (
+                <button
+                  onClick={() => toggleTodoExpanded(todo.id)}
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {isExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
             </div>
           );
         })}
@@ -159,16 +152,16 @@ export const Plan: FC<PlanProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setExpanded(!expanded)}
-          className="w-full"
+          className="w-full h-8 text-xs"
         >
           {expanded ? (
             <>
-              <ChevronUp className="w-4 h-4 mr-2" />
+              <ChevronUp className="w-3.5 h-3.5 mr-1.5" />
               Show Less
             </>
           ) : (
             <>
-              <ChevronDown className="w-4 h-4 mr-2" />
+              <ChevronDown className="w-3.5 h-3.5 mr-1.5" />
               Show {todos.length - maxVisibleTodos} More
             </>
           )}
@@ -177,8 +170,8 @@ export const Plan: FC<PlanProps> = ({
 
       {/* Celebration Message */}
       {allCompleted && (
-        <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+        <div className="text-center py-2 px-3 bg-yellow-50 dark:bg-yellow-950/20 rounded border border-yellow-200 dark:border-yellow-800">
+          <p className="text-xs font-medium text-yellow-900 dark:text-yellow-100">
             All tasks completed! Great work! 🎉
           </p>
         </div>

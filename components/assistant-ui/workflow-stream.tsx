@@ -87,7 +87,7 @@ export function WorkflowStream({ confidence, onClose }: WorkflowStreamProps) {
         source: stream,
         connector,
         wrtcParams: params,
-        onData: (data: WorkflowStreamData) => {
+        onData: (data: any) => {
           setDetectionData(data);
         },
       });
@@ -224,13 +224,13 @@ export function WorkflowStream({ confidence, onClose }: WorkflowStreamProps) {
           {detectionData.count_objects !== undefined && (
             <div className="px-4 py-2 bg-black/70 text-white rounded-lg">
               <div className="text-xs opacity-80">Objects</div>
-              <div className="text-2xl font-bold">{detectionData.count_objects}</div>
+              <div className="text-xl font-bold">{detectionData.count_objects}</div>
             </div>
           )}
           {detectionData.predictions && (
             <div className="px-4 py-2 bg-black/70 text-white rounded-lg">
               <div className="text-xs opacity-80">Predictions</div>
-              <div className="text-2xl font-bold">
+              <div className="text-xl font-bold">
                 {detectionData.predictions.length}
               </div>
             </div>

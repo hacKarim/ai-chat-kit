@@ -3,6 +3,7 @@ import {
   ThreadListItemPrimitive,
   ThreadListPrimitive,
   useAssistantState,
+  useThreadListItem,
 } from "@assistant-ui/react";
 import { PlusIcon, XIcon, LayoutDashboard } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -16,6 +17,15 @@ export const ThreadList: FC = () => {
     <ThreadListPrimitive.Root className="aui-root aui-thread-list-root flex flex-col items-stretch gap-1.5">
       <DashboardButton />
       <ThreadListNew />
+
+      {/* Separator */}
+      <div className="my-2 border-t border-border/40" />
+
+      {/* History Label */}
+      <div className="px-2.5 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        Recent
+      </div>
+
       <ThreadListItems />
     </ThreadListPrimitive.Root>
   );
@@ -24,11 +34,11 @@ export const ThreadList: FC = () => {
 const DashboardButton: FC = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const isActive = pathname === "/dashboard";
+  const isActive = pathname === "/home";
 
   const handleClick = () => {
-    if (pathname !== "/dashboard") {
-      router.push("/dashboard", { scroll: false });
+    if (pathname !== "/home") {
+      router.push("/home", { scroll: false });
     }
   };
 
@@ -40,7 +50,7 @@ const DashboardButton: FC = () => {
       data-active={isActive ? "" : undefined}
     >
       <LayoutDashboard className="size-4" />
-      Dashboard
+      Home
     </Button>
   );
 };
@@ -88,8 +98,13 @@ const ThreadListSkeleton: FC = () => {
 };
 
 const ThreadListItem: FC = () => {
+  const title = useThreadListItem((t) => t.title);
+
   return (
-    <ThreadListItemPrimitive.Root className="aui-thread-list-item group/archive flex items-center gap-2 rounded-lg transition-all hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-active:bg-muted">
+    <ThreadListItemPrimitive.Root
+      className="aui-thread-list-item group/archive flex items-center gap-2 rounded-lg transition-all hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-active:bg-muted data-[new-chat=true]:hidden"
+      data-new-chat={title === "New Chat" ? "true" : undefined}
+    >
       <ThreadListItemPrimitive.Trigger className="cursor-pointer aui-thread-list-item-trigger flex-grow px-3 py-2 text-start overflow-hidden">
         <ThreadListItemTitle />
       </ThreadListItemPrimitive.Trigger>

@@ -2,7 +2,7 @@ import { FC, useEffect, useState, useRef, useContext } from "react";
 import { Mic, Square, Loader2, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
-import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
+import { useVoiceRecorderContext } from "@/contexts/voice-recorder-context";
 import { ListeningModeContext } from "@/components/assistant-ui/thread";
 
 interface VoiceRecorderProps {
@@ -33,12 +33,7 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
     pauseListening,
     resumeListening,
     hasRecording,
-  } = useVoiceRecorder(() => {
-    // Called when VAD detects voice - stop audio immediately if playing
-    if (isAudioPlaying && onRecordingStart) {
-      onRecordingStart();
-    }
-  });
+  } = useVoiceRecorderContext();
 
   const [recordingDuration, setRecordingDuration] = useState(0);
   const sendOnStopRef = useRef(false);

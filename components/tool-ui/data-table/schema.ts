@@ -60,9 +60,15 @@ export function parseSerializableDataTable(input: any): SerializableDataTable {
     id: row.id || crypto.randomUUID(),
   }));
 
+  // Map column 'id' to 'key' and ensure each column has a unique key
+  const columns = (input.columns || []).map((column: any) => ({
+    ...column,
+    key: column.key || column.id || crypto.randomUUID(),
+  }));
+
   return {
     id: input.id || crypto.randomUUID(),
-    columns: input.columns || [],
+    columns,
     data: dataWithIds,
     rowIdKey: input.rowIdKey || "id",
     caption,

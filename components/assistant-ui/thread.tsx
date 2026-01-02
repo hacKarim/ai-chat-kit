@@ -84,6 +84,12 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
   const lastKnownMessageIdRef = useRef<string | null>(null);
   const shouldStopPlaybackRef = useRef(false);
 
+  // Custom scroll behavior refs
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true); // Start as true to allow initial scroll
+  const previousMessageCountRef = useRef(0);
+  const lastMessageIdRef = useRef<string | null>(null);
+
   // Notify parent when listening mode changes
   useEffect(() => {
     if (onListeningModeChange) {
@@ -356,6 +362,69 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
     };
   }, [isListeningMode, currentlyPlayingMessageId, lastAutoPlayedMessageId, audioPlayer]);
 
+  // Scroll event listener to detect if user is near bottom
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      // User is "near bottom" if within 100px of the bottom
+      isNearBottomRef.current = distanceFromBottom < 100;
+    };
+
+    viewport.addEventListener('scroll', handleScroll);
+    // Call once to set initial state
+    handleScroll();
+
+    return () => {
+      viewport.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Message detection effect - scroll to new messages
+  const thread = useThread();
+  const messages = thread.messages;
+
+  useEffect(() => {
+    // Skip on initial mount
+    if (previousMessageCountRef.current === 0 && messages.length > 0) {
+      previousMessageCountRef.current = messages.length;
+      if (messages.length > 0) {
+        lastMessageIdRef.current = messages[messages.length - 1].id;
+      }
+      return;
+    }
+
+    // Check if a new message was added
+    if (messages.length > previousMessageCountRef.current) {
+      const newMessage = messages[messages.length - 1];
+
+      // Only scroll if user is near bottom (respecting user's scroll position)
+      if (isNearBottomRef.current && newMessage.id !== lastMessageIdRef.current) {
+        // Use requestAnimationFrame to ensure DOM is updated
+        requestAnimationFrame(() => {
+          // Find the new message element
+          const messageElements = document.querySelectorAll('[data-role]');
+          const newMessageElement = messageElements[messageElements.length - 1];
+
+          if (newMessageElement) {
+            newMessageElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start', // Scroll to the first line (top) of the message
+              inline: 'nearest'
+            });
+          }
+        });
+      }
+
+      // Update tracking refs
+      previousMessageCountRef.current = messages.length;
+      lastMessageIdRef.current = newMessage.id;
+    }
+  }, [messages]);
+
   return (
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
@@ -375,7 +444,14 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
               ["--thread-max-width" as string]: "44rem",
             }}
           >
-            <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
+            <ThreadPrimitive.Viewport
+              ref={(el) => {
+                if (el) {
+                  viewportRef.current = el as HTMLDivElement;
+                }
+              }}
+              className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4"
+            >
               <ThreadPrimitive.If empty>
                 <ThreadWelcome />
               </ThreadPrimitive.If>
@@ -630,7 +706,19 @@ const Composer: FC = () => {
         difyMessageId = dataPart?.data?.difyMessageId;
       }
 
-      const finalMessageId = difyMessageId || messageId;
+      // If no dify message ID in content, try to extract from messageId
+      // Handle pattern: msg-{uuid}-assistant -> extract {uuid}
+      let finalMessageId = difyMessageId;
+      if (!finalMessageId && messageId && typeof messageId === 'string') {
+        const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
+        if (match && match[1] && match[1].includes("-")) {
+          // If it looks like a UUID (contains hyphens), use it
+          finalMessageId = match[1];
+        } else {
+          // Fallback to original messageId
+          finalMessageId = messageId;
+        }
+      }
 
       if (finalMessageId && finalMessageId !== lastMessageId) {
         setLastMessageId(finalMessageId);

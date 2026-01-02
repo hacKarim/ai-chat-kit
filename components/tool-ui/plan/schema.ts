@@ -33,12 +33,36 @@ export function parseSerializablePlan(data: any): SerializablePlan {
     }
   };
 
+  // Flatten nested items recursively
+  const flattenItems = (items: any[], parentTitle?: string): PlanTodo[] => {
+    const result: PlanTodo[] = [];
+
+    items.forEach((item: any) => {
+      // Map title/label field
+      const label = item.label || item.title;
+
+      // Add the parent item
+      if (label) {
+        result.push({
+          id: item.id || crypto.randomUUID(),
+          label: label,
+          status: mapStatus(item.status || "pending"),
+          description: item.description,
+        });
+      }
+
+      // Recursively flatten nested items
+      if (item.items && Array.isArray(item.items)) {
+        result.push(...flattenItems(item.items, label));
+      }
+    });
+
+    return result;
+  };
+
   // Support both 'todos' and 'items' field names
-  const rawTodos = data.todos || data.items || [];
-  const todos = rawTodos.map((todo: any) => ({
-    ...todo,
-    status: mapStatus(todo.status),
-  }));
+  const rawItems = data.todos || data.items || [];
+  const todos = flattenItems(rawItems);
 
   return {
     id: data.id || crypto.randomUUID(),

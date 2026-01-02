@@ -42,14 +42,14 @@ export const NextBestAction: FC<NextBestActionProps> = ({
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col md:flex-row md:flex-wrap gap-3">
         {actions.map((action) => (
           <Button
             key={action.id}
             variant={action.variant || "default"}
             onClick={() => handleActionClick(action.prompt)}
             className={cn(
-              "h-auto w-full flex-row items-center justify-between gap-4 p-4 text-left cursor-pointer",
+              "h-auto w-full md:flex-1 flex-row items-center justify-between gap-4 p-4 text-left cursor-pointer",
               "hover:scale-[1.01] transition-transform"
             )}
           >

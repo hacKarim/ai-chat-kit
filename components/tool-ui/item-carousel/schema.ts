@@ -30,6 +30,6 @@ export function parseSerializableItemCarousel(data: any): SerializableItemCarous
     items,
     loop: data.loop ?? true,
     autoPlay: data.autoPlay ?? false,
-    autoPlayInterval: data.autoPlayInterval ?? 3000,
+    autoPlayInterval: data.autoPlayInterval ?? 1000,
   };
 }

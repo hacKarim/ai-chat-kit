@@ -244,7 +244,7 @@ export function useVoiceRecorder(onVoiceDetected?: () => void) {
       setRecordingState("listening");
 
       // Voice threshold (adjust based on testing)
-      const VOICE_THRESHOLD = 10; // Lower = more sensitive
+      const VOICE_THRESHOLD = 15; // Lower = more sensitive
       const SILENCE_DURATION = 1500; // ms of silence before stopping
 
       // Start VAD monitoring

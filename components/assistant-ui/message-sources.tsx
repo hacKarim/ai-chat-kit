@@ -61,7 +61,7 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
           variant="outline"
           size="sm"
           className={cn(
-            "h-[38px] rounded-full px-3 py-2 text-xs font-semibold gap-1.5",
+            "h-7 rounded-full px-1 py-1 text-xs font-semibold gap-1.5",
             "hover:bg-token-main-surface-secondary transition-colors cursor-pointer",
             "border-token-border-default bg-token-main-surface-primary",
             "mt-0 mb-0"
@@ -80,7 +80,7 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
                   index > 0 && "-ms-1 first:me-0"
                 )}
               >
-                <Avatar className="size-4 border-0">
+                <Avatar className="size-3 border-0">
                   <AvatarImage
                     src={getFaviconUrl(source.document_name)}
                     alt={source.dataset_name}

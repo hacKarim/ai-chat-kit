@@ -453,6 +453,68 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
     .map((c) => c.text)
     .join(" ") || "";
 
+  // Smooth autoscroll during streaming
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    // Only autoscroll if user is near bottom
+    if (!isNearBottomRef.current) return;
+
+    let scrollTimeout: NodeJS.Timeout | null = null;
+    let lastScrollTime = 0;
+    const scrollThrottle = 150; // Throttle scroll calls to every 150ms for slower effect
+
+    // Smoothly scroll to bottom whenever content changes
+    const scrollToBottom = () => {
+      const now = Date.now();
+      const timeSinceLastScroll = now - lastScrollTime;
+
+      // Throttle scroll calls
+      if (timeSinceLastScroll < scrollThrottle) {
+        // Clear existing timeout and schedule new one
+        if (scrollTimeout) {
+          clearTimeout(scrollTimeout);
+        }
+        scrollTimeout = setTimeout(() => {
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: 'smooth'
+          });
+          lastScrollTime = Date.now();
+        }, scrollThrottle - timeSinceLastScroll);
+      } else {
+        // Execute scroll immediately
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: 'smooth'
+        });
+        lastScrollTime = now;
+      }
+    };
+
+    // Create a MutationObserver to watch for content changes
+    const observer = new MutationObserver(() => {
+      if (isNearBottomRef.current) {
+        scrollToBottom();
+      }
+    });
+
+    // Observe the viewport for any changes in the subtree
+    observer.observe(viewport, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      observer.disconnect();
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+    };
+  }, [messages]);
+
   useEffect(() => {
     // Skip on initial mount
     if (previousMessageCountRef.current === 0 && messages.length > 0) {
@@ -466,24 +528,6 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
     // Check if a new message was added
     if (messages.length > previousMessageCountRef.current) {
       const newMessage = messages[messages.length - 1];
-
-      // Only scroll if user is near bottom (respecting user's scroll position)
-      if (isNearBottomRef.current && newMessage.id !== lastMessageIdRef.current) {
-        // Use requestAnimationFrame to ensure DOM is updated
-        requestAnimationFrame(() => {
-          // Find the new message element
-          const messageElements = document.querySelectorAll('[data-role]');
-          const newMessageElement = messageElements[messageElements.length - 1];
-
-          if (newMessageElement) {
-            newMessageElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start', // Scroll to the first line (top) of the message
-              inline: 'nearest'
-            });
-          }
-        });
-      }
 
       // Update tracking refs
       previousMessageCountRef.current = messages.length;
@@ -516,7 +560,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
                   viewportRef.current = el as HTMLDivElement;
                 }
               }}
-              className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4 pt-20"
+              className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-20"
             >
               <ThreadPrimitive.If empty>
                 <ThreadWelcome />

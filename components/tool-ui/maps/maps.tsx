@@ -133,10 +133,8 @@ export const Maps: FC<MapsProps> = ({
             <img
               src={mapImageUrl}
               alt={title || destination}
-              className="w-full h-full object-cover brightness-90 contrast-125 saturate-50"
-              style={{
-                filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.1)',
-              }}
+              className="w-full h-full object-cover "
+
               loading="lazy"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';

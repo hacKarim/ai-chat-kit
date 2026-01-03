@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView, Variant } from "motion/react";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, type ElementType } from "react";
 import { cn } from "@/lib/utils";
 
 type AnimationType = "blurIn" | "blurInUp" | "fadeIn" | "slideUp";
@@ -11,7 +11,7 @@ interface TextAnimateProps {
   children: string;
   animation?: AnimationType;
   by?: AnimationBy;
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
   className?: string;
   delay?: number;
   duration?: number;
@@ -87,7 +87,6 @@ export function TextAnimate({
           variants={variants}
           transition={{ duration }}
           className={cn(className)}
-          {...{ [Component]: true }}
         >
           {Component === "p" || Component === "span" || Component === "div" ? (
             <Component className={cn(className)}>{children}</Component>

@@ -46,7 +46,7 @@ export const NextBestAction: FC<NextBestActionProps> = ({
         {actions.map((action) => (
           <Button
             key={action.id}
-            variant={action.variant || "default"}
+            variant={action.variant || "secondary"}
             onClick={() => handleActionClick(action.prompt)}
             className={cn(
               "h-auto w-full md:flex-1 flex-row items-center justify-between gap-4 p-4 text-left cursor-pointer",

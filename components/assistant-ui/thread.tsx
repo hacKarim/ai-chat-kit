@@ -71,6 +71,7 @@ import { getOrCreateSessionId } from "@/lib/session";
 import { VoiceRecorder } from "@/components/assistant-ui/voice-recorder";
 import { MessageSources } from "@/components/assistant-ui/message-sources";
 import { VoiceRecorderProvider, useVoiceRecorderContext } from "@/contexts/voice-recorder-context";
+import { VoiceModal } from "@/components/assistant-ui/voice-modal";
 
 import { cn } from "@/lib/utils";
 
@@ -83,6 +84,11 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastKnownMessageIdRef = useRef<string | null>(null);
   const shouldStopPlaybackRef = useRef(false);
+
+  // TTS audio visualization
+  const ttsAudioContextRef = useRef<AudioContext | null>(null);
+  const ttsAnalyserRef = useRef<AnalyserNode | null>(null);
+  const ttsSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Custom scroll behavior refs
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -183,7 +189,32 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
 
             // Create and play audio for this chunk
             const audio = new Audio(audioUrl);
+            audio.playbackRate = 1.2; // Play 10% faster
             currentAudioRef.current = audio;
+
+            // Set up audio visualization for TTS
+            if (!ttsAudioContextRef.current) {
+              ttsAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+              ttsAnalyserRef.current = ttsAudioContextRef.current.createAnalyser();
+              ttsAnalyserRef.current.fftSize = 256;
+              ttsAnalyserRef.current.smoothingTimeConstant = 0.8;
+            }
+
+            // Disconnect previous source if it exists
+            if (ttsSourceRef.current) {
+              try {
+                ttsSourceRef.current.disconnect();
+              } catch (e) {
+                // Ignore if already disconnected
+              }
+            }
+
+            // Create new source and connect to analyser for this audio element
+            if (ttsAudioContextRef.current && ttsAnalyserRef.current) {
+              ttsSourceRef.current = ttsAudioContextRef.current.createMediaElementSource(audio);
+              ttsSourceRef.current.connect(ttsAnalyserRef.current);
+              ttsAnalyserRef.current.connect(ttsAudioContextRef.current.destination);
+            }
 
             // Wait for chunk to finish playing before continuing
             await new Promise<void>((resolve, reject) => {
@@ -230,7 +261,32 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
           const audioUrl = URL.createObjectURL(audioBlob);
 
           const audio = new Audio(audioUrl);
+          audio.playbackRate = 1.2; // Play 10% faster
           currentAudioRef.current = audio;
+
+          // Set up audio visualization for TTS
+          if (!ttsAudioContextRef.current) {
+            ttsAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            ttsAnalyserRef.current = ttsAudioContextRef.current.createAnalyser();
+            ttsAnalyserRef.current.fftSize = 256;
+            ttsAnalyserRef.current.smoothingTimeConstant = 0.8;
+          }
+
+          // Disconnect previous source if it exists
+          if (ttsSourceRef.current) {
+            try {
+              ttsSourceRef.current.disconnect();
+            } catch (e) {
+              // Ignore if already disconnected
+            }
+          }
+
+          // Create new source and connect to analyser for this audio element
+          if (ttsAudioContextRef.current && ttsAnalyserRef.current) {
+            ttsSourceRef.current = ttsAudioContextRef.current.createMediaElementSource(audio);
+            ttsSourceRef.current.connect(ttsAnalyserRef.current);
+            ttsAnalyserRef.current.connect(ttsAudioContextRef.current.destination);
+          }
 
           audio.onplay = () => {
             setCurrentlyPlayingMessageId(messageId);
@@ -387,6 +443,16 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
   const thread = useThread();
   const messages = thread.messages;
 
+  // Get latest assistant message for voice modal
+  const latestAssistantMessage = messages
+    .slice()
+    .reverse()
+    .find((m) => m.role === "assistant");
+  const latestResponse = latestAssistantMessage?.content
+    .filter((c) => c.type === "text")
+    .map((c) => c.text)
+    .join(" ") || "";
+
   useEffect(() => {
     // Skip on initial mount
     if (previousMessageCountRef.current === 0 && messages.length > 0) {
@@ -439,7 +505,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
           <AudioPlayerContext.Provider value={audioPlayer}>
             <ListeningModeContext.Provider value={{ isListeningMode, setIsListeningMode }}>
           <ThreadPrimitive.Root
-            className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
+            className="aui-root aui-thread-root @container flex h-full flex-col"
             style={{
               ["--thread-max-width" as string]: "44rem",
             }}
@@ -450,7 +516,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
                   viewportRef.current = el as HTMLDivElement;
                 }
               }}
-              className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4"
+              className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4 pt-20"
             >
               <ThreadPrimitive.If empty>
                 <ThreadWelcome />
@@ -471,6 +537,12 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
               <Composer />
             </ThreadPrimitive.Viewport>
           </ThreadPrimitive.Root>
+          <VoiceModal
+            open={isListeningMode}
+            onClose={() => setIsListeningMode(false)}
+            latestResponse={latestResponse}
+            ttsAnalyserRef={ttsAnalyserRef}
+          />
           </ListeningModeContext.Provider>
         </AudioPlayerContext.Provider>
         </VoiceRecorderProvider>
@@ -505,7 +577,7 @@ const ThreadWelcome: FC = () => {
             transition={{ delay: 0.5 }}
             className="aui-thread-welcome-message-motion-1 text-2xl font-semibold"
           >
-            Hello there!
+            Hello, how can I help?
           </m.div>
           <m.div
             initial={{ opacity: 0, y: 10 }}
@@ -514,7 +586,7 @@ const ThreadWelcome: FC = () => {
             transition={{ delay: 0.6 }}
             className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
           >
-            How can I help you today?
+            Comment puis-je vous aider aujourd'hui ?
           </m.div>
         </div>
       </div>
@@ -528,24 +600,24 @@ const ThreadSuggestions: FC = () => {
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 pb-4 @md:grid-cols-2">
       {[
         {
-          title: "Help answering",
-          label: "a client question",
-          action: "I need help answering a client",
+          title: "Répondre à",
+          label: "une question client",
+          action: "J'ai besoin d'aide pour répondre à un client",
         },
         {
-          title: "Launch training",
-          label: "session on products",
-          action: "Launch a training session",
+          title: "Lancer une formation",
+          label: "sur les produits",
+          action: "Lancer une session de formation",
         },
         {
-          title: "Prepare for",
-          label: "my next meeting",
-          action: "Prepare for my next meeting",
+          title: "Préparer",
+          label: "mon prochain rendez-vous",
+          action: "Préparer mon prochain rendez-vous",
         },
         {
-          title: "Review client",
-          label: "visit schedule",
-          action: "What are my upcoming client visits?",
+          title: "Voir le planning",
+          label: "des visites clients",
+          action: "Quelles sont mes prochaines visites clients ?",
         },
       ].map((suggestedAction, index) => (
         <m.div
@@ -762,7 +834,7 @@ const Composer: FC = () => {
           <ComposerAttachments />
 
           <ComposerPrimitive.Input
-            placeholder="Send a message..."
+            placeholder="Envoyer un message..."
             className="aui-composer-input max-h-32 min-h-12 w-full resize-none bg-transparent px-3.5 pt-1.5  text-base outline-none placeholder:text-muted-foreground focus-visible:ring-0"
             rows={1}
             autoFocus

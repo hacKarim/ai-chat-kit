@@ -28,16 +28,38 @@ export function parseSerializableNextBestAction(data: any): SerializableNextBest
     }
   };
 
+  // Helper to extract prompt from action
+  const extractPrompt = (action: any): string => {
+    // Try various locations for the prompt
+    if (action.prompt) return action.prompt;
+    if (action.action) return action.action; // Handle "action" field
+    if (action.payload?.question) return action.payload.question;
+    if (action.payload?.topic) return action.payload.topic;
+    if (action.payload?.message) return action.payload.message;
+    return action.label; // Fallback to label
+  };
+
   // Auto-generate IDs for actions if not provided (max 3)
-  const actions = Array.isArray(data.actions)
-    ? data.actions.slice(0, 3).map((action: any) => ({
+  // Support multiple formats: actions, options, primaryAction+secondaryActions
+  let actionsData = data.actions || data.options;
+
+  // Handle primaryAction + secondaryActions format
+  if (!actionsData && (data.primaryAction || data.secondaryActions)) {
+    actionsData = [
+      ...(data.primaryAction ? [data.primaryAction] : []),
+      ...(data.secondaryActions || [])
+    ];
+  }
+
+  const actions = Array.isArray(actionsData)
+    ? actionsData.slice(0, 3).map((action: any) => ({
         id: action.id || crypto.randomUUID(),
         label: action.label,
         description: action.description,
-        // Use label as prompt if prompt is not provided
-        prompt: action.prompt || action.label,
-        // Map variant from type or variant field
-        variant: mapVariant(action.variant || action.type),
+        // Extract prompt from various possible locations
+        prompt: extractPrompt(action),
+        // Map variant from type, actionType, variant, or style field
+        variant: mapVariant(action.variant || action.type || action.actionType || action.style),
       }))
     : [];
 

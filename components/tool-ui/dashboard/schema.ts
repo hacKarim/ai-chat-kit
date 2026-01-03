@@ -50,21 +50,48 @@ export interface SerializableDashboard {
   title?: string;
   description?: string;
   tiles: DashboardTile[];
-  columns?: 1 | 2 | 3 | 4;
+  columns?: 1 | 2;
 }
 
 export function parseSerializableDashboard(data: any): SerializableDashboard {
+  // Helper function to parse trend string to trend type
+  const parseTrend = (trendStr?: string): "up" | "down" | "neutral" | undefined => {
+    if (!trendStr) return undefined;
+    const str = trendStr.toLowerCase();
+    if (str.includes('+') || str.includes('↑') || str.includes('positive')) return "up";
+    if (str.includes('-') || str.includes('↓') || str.includes('negative')) return "down";
+    return "neutral";
+  };
+
+  // Handle kpis format (alternative to tiles)
+  let tilesData = data.tiles;
+  if (!tilesData && data.kpis) {
+    tilesData = data.kpis.map((kpi: any) => ({
+      type: "metric",
+      id: kpi.id || crypto.randomUUID(),
+      label: kpi.label,
+      value: kpi.value,
+      icon: kpi.icon,
+      trend: parseTrend(kpi.trend),
+      delta: kpi.trend, // The trend string becomes the delta
+      size: kpi.size,
+    }));
+  }
+
   // Auto-generate IDs for tiles if not provided
-  const tiles = (data.tiles || []).map((tile: any) => ({
+  const tiles = (tilesData || []).map((tile: any) => ({
     ...tile,
     id: tile.id || crypto.randomUUID(),
   }));
+
+  // Clamp columns to max 2
+  const columns = Math.min(data.columns || 2, 2) as 1 | 2;
 
   return {
     id: data.id || crypto.randomUUID(),
     title: data.title,
     description: data.description,
     tiles,
-    columns: data.columns || 2,
+    columns,
   };
 }

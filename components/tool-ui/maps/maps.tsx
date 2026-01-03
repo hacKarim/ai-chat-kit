@@ -116,7 +116,7 @@ export const Maps: FC<MapsProps> = ({
       data-slot="maps"
     >
       <div
-        className="bg-gray-950 text-white border border-gray-800 rounded-lg overflow-hidden hover:scale-[1.01] transition-transform cursor-pointer"
+        className="bg-secondary text-primary border  rounded-lg overflow-hidden hover:scale-[1.01] transition-transform cursor-pointer"
         onClick={handleMapClick}
         role="button"
         tabIndex={0}

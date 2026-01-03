@@ -11,18 +11,21 @@ interface DashboardProps extends SerializableDashboard {
   className?: string;
 }
 
-// Get tile size class (defaults to col-span-1 for better grid layout)
+// Get tile size class for flex layout (tiles auto-fill available space)
 const getTileSizeClass = (size: string = "small", columns: number = 2) => {
   switch (size) {
     case "large":
-      // Large tiles take full width or half width depending on columns
-      return columns >= 3 ? "md:col-span-2 col-span-1" : "col-span-full";
+      // Large tiles take full width
+      return "w-full";
     case "medium":
-      // Medium tiles take 1 column normally, 2 on larger grids
-      return columns >= 4 ? "md:col-span-2 col-span-1" : "col-span-1";
+      // Medium tiles flex to fill space
+      if (columns === 1) return "w-full";
+      return "flex-1 min-w-full md:min-w-[300px]";
     case "small":
     default:
-      return "col-span-1";
+      // Small tiles flex to fill space
+      if (columns === 1) return "w-full";
+      return "flex-1 min-w-full md:min-w-[200px]";
   }
 };
 
@@ -110,7 +113,7 @@ const StatComparisonTileComponent: FC<{ tile: StatComparisonTile; columns: numbe
           {tile.stats.map((stat, index) => (
             <div key={index} className="flex flex-col items-center gap-0.5">
               <p className="text-[10px] text-muted-foreground">{stat.label}</p>
-              <p className="text-lg font-bold">{stat.value}</p>
+              <p className="text font-bold">{stat.value}</p>
             </div>
           ))}
         </div>
@@ -162,12 +165,8 @@ export const Dashboard: FC<DashboardProps> = ({
   columns = 2,
   className,
 }) => {
-  const gridClass = cn(
-    "grid gap-3",
-    columns === 1 && "grid-cols-1",
-    columns === 2 && "grid-cols-1 md:grid-cols-2",
-    columns === 3 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
-    columns === 4 && "grid-cols-2 md:grid-cols-4",
+  const flexClass = cn(
+    "flex flex-wrap gap-3"
   );
 
   return (
@@ -192,8 +191,8 @@ export const Dashboard: FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Tiles Grid */}
-      <div className={gridClass}>
+      {/* Tiles Flex Container */}
+      <div className={flexClass}>
         {tiles.map((tile) => {
           switch (tile.type) {
             case "metric":

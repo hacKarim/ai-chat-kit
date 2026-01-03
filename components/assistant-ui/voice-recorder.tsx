@@ -1,5 +1,5 @@
 import { FC, useEffect, useState, useRef, useContext } from "react";
-import { Mic, Square, Loader2, Radio } from "lucide-react";
+import { Mic, Square, Loader2, Radio, AudioWaveform } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { useVoiceRecorderContext } from "@/contexts/voice-recorder-context";
@@ -37,9 +37,7 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
 
   const [recordingDuration, setRecordingDuration] = useState(0);
   const sendOnStopRef = useRef(false);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isListeningModeRef = useRef(false);
-  const longPressTriggeredRef = useRef(false);
+  const isListeningModeActiveRef = useRef(false);
   const lastSentBlobRef = useRef<Blob | null>(null);
 
   // Timer for recording duration
@@ -57,10 +55,13 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
 
   const { setIsListeningMode } = useContext(ListeningModeContext);
 
-  // Update listening mode context
+  // Update listening mode context - keep modal open during entire listening session
   useEffect(() => {
-    const isListening = recordingState === "listening";
-    setIsListeningMode(isListening);
+    // If we're back to idle and were in listening mode, end the session
+    if (recordingState === "idle" && isListeningModeActiveRef.current) {
+      isListeningModeActiveRef.current = false;
+    }
+    setIsListeningMode(isListeningModeActiveRef.current);
   }, [recordingState, setIsListeningMode]);
 
   // Pause/resume listening based on thread running state
@@ -101,7 +102,7 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
       // Since we can't access the blob directly, we'll use hasRecording as a proxy
 
       // Handle auto-send for normal recording (idle state)
-      if (recordingState === "idle" && hasRecording && sendOnStopRef.current && !isListeningModeRef.current) {
+      if (recordingState === "idle" && hasRecording && sendOnStopRef.current && !isListeningModeActiveRef.current) {
         sendOnStopRef.current = false;
         try {
           await sendRecording(onTranscription);
@@ -111,7 +112,7 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
       }
 
       // Handle auto-send for listening mode (returns to listening state)
-      if (recordingState === "listening" && hasRecording && isListeningModeRef.current) {
+      if (recordingState === "listening" && hasRecording && isListeningModeActiveRef.current) {
         // Pause listening while transcribing and waiting for LLM
         pauseListening();
 
@@ -134,55 +135,11 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
     autoSend();
   }, [recordingState, hasRecording, sendRecording, onTranscription, onAutoSend, pauseListening, resumeListening]);
 
-  const handleMouseDown = async () => {
+  // Handle mic button click (regular recording)
+  const handleMicClick = async () => {
     if (disabled) return;
 
-    // Reset long press flag
-    longPressTriggeredRef.current = false;
-
-    // Start long-press timer (500ms for long-press)
-    longPressTimerRef.current = setTimeout(async () => {
-      longPressTriggeredRef.current = true;
-      isListeningModeRef.current = true;
-      sendOnStopRef.current = true;
-      try {
-        // Stop any playing audio when user starts listening mode
-        if (onRecordingStart) {
-          onRecordingStart();
-        }
-        await startListeningMode();
-      } catch (error) {
-        alert("Failed to access microphone. Please check permissions.");
-        isListeningModeRef.current = false;
-        longPressTriggeredRef.current = false;
-      }
-    }, 500);
-  };
-
-  const handleMouseUp = async () => {
-    if (disabled) return;
-
-    // Clear long-press timer if it hasn't fired yet
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-
-    // If we just triggered a long press, don't do anything on release
-    if (longPressTriggeredRef.current) {
-      longPressTriggeredRef.current = false;
-      return;
-    }
-
-    // Short click: toggle listening mode if already in it
-    if (recordingState === "listening") {
-      isListeningModeRef.current = false;
-      sendOnStopRef.current = false;
-      stopListeningMode();
-      return;
-    }
-
-    // Short click: toggle regular recording
+    // Toggle regular recording
     if (recordingState === "idle") {
       // Start regular recording
       try {
@@ -201,11 +158,29 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
     }
   };
 
-  const handleMouseLeave = () => {
-    // Clear long-press timer if mouse leaves button
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+  // Handle waveform button click (continuous/listening mode)
+  const handleWaveformClick = async () => {
+    if (disabled) return;
+
+    // Toggle listening mode
+    if (recordingState === "listening" || isListeningModeActiveRef.current) {
+      isListeningModeActiveRef.current = false;
+      sendOnStopRef.current = false;
+      stopListeningMode();
+    } else if (recordingState === "idle") {
+      // Start listening mode
+      isListeningModeActiveRef.current = true;
+      sendOnStopRef.current = true;
+      try {
+        // Stop any playing audio when user starts listening mode
+        if (onRecordingStart) {
+          onRecordingStart();
+        }
+        await startListeningMode();
+      } catch (error) {
+        alert("Failed to access microphone. Please check permissions.");
+        isListeningModeActiveRef.current = false;
+      }
     }
   };
 
@@ -221,64 +196,69 @@ export const VoiceRecorder: FC<VoiceRecorderProps> = ({
 
   return (
     <div className="flex items-center gap-2">
-      {isListening && !isRecording && (
-        <div className="flex items-center gap-2 text-sm text-blue-500 animate-in fade-in slide-in-from-left-2 duration-200">
-          <div className="flex items-center gap-1.5">
-            <div className="size-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-medium">Listening...</span>
-          </div>
-        </div>
-      )}
-
-      {isRecording && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-200">
-          <div className="flex items-center gap-1.5">
-            <div className="size-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="font-mono text-xs">{formatDuration(recordingDuration)}</span>
-          </div>
-        </div>
-      )}
-
+      {/* Waveform button for continuous/listening mode */}
       <TooltipIconButton
         tooltip={
           isProcessing
             ? "Transcribing..."
             : isListening
-            ? "Click to stop listening"
+            ? "Stop continuous mode"
+            : "Continuous mode"
+        }
+        variant={isListening ? "default" : "ghost"}
+        size="icon"
+        className={cn(
+          "size-[34px] rounded-full transition-all duration-200",
+          isListening &&
+            "bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600",
+          isProcessing && "opacity-50 cursor-not-allowed"
+        )}
+        onClick={handleWaveformClick}
+        disabled={disabled || isProcessing || isRecording}
+        aria-label={
+          isProcessing
+            ? "Transcribing..."
+            : isListening
+            ? "Stop continuous mode"
+            : "Start continuous mode"
+        }
+      >
+        {isListening ? (
+          <Radio className="size-5" />
+        ) : (
+          <AudioWaveform className="size-5" />
+        )}
+      </TooltipIconButton>
+
+      {/* Mic button for regular recording */}
+      <TooltipIconButton
+        tooltip={
+          isProcessing
+            ? "Transcribing..."
             : isRecording
             ? "Stop and send"
-            : "Click to record, hold for continuous mode"
+            : "Click to record"
         }
-        variant={isRecording ? "default" : isListening ? "default" : "ghost"}
+        variant={isRecording ? "default" : "ghost"}
         size="icon"
         className={cn(
           "aui-voice-recorder size-[34px] rounded-full transition-all duration-200",
           isRecording &&
             "bg-red-500 hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600 animate-pulse",
-          isListening &&
-            "bg-blue-500 hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600",
           isProcessing && "opacity-50 cursor-not-allowed"
         )}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onTouchStart={handleMouseDown}
-        onTouchEnd={handleMouseUp}
-        disabled={disabled || isProcessing}
+        onClick={handleMicClick}
+        disabled={disabled || isProcessing || isListening}
         aria-label={
           isProcessing
             ? "Transcribing..."
-            : isListening
-            ? "Click to stop listening"
             : isRecording
             ? "Stop and send"
-            : "Click to record, hold for continuous mode"
+            : "Click to record"
         }
       >
         {isProcessing ? (
           <Loader2 className="size-5 animate-spin" />
-        ) : isListening ? (
-          <Radio className="size-5" />
         ) : isRecording ? (
           <Square className="size-4 fill-white dark:fill-black" />
         ) : (

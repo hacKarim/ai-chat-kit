@@ -22,7 +22,7 @@ export function ThreadListSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
-      <SidebarHeader className="aui-sidebar-header mb-2 border-b">
+      <SidebarHeader className="aui-sidebar-header mb-2">
         <div className="aui-sidebar-header-content flex items-center justify-between">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -35,7 +35,7 @@ export function ThreadListSidebar({
                     <MessagesSquare className="aui-sidebar-header-icon size-4" />
                   </div>
                   <div className="aui-sidebar-header-heading mr-6 flex flex-col gap-0.5 leading-none">
-                    <span className="aui-sidebar-header-title font-semibold">
+                    <span className="aui-sidebar-header-title font-semibold text-2xl">
                       Assistant
                     </span>
                   </div>
@@ -49,7 +49,7 @@ export function ThreadListSidebar({
         <ThreadList />
       </SidebarContent>
       <SidebarRail />
-      <SidebarFooter className="aui-sidebar-footer border-t">
+      <SidebarFooter className="aui-sidebar-footer">
         <SidebarMenu>
           <SidebarMenuItem>
             <UserIdDisplay />

@@ -7,8 +7,8 @@ import type { SerializableItemCarousel, CarouselItem as Item } from "./schema";
 
 interface ItemCarouselProps extends SerializableItemCarousel {
   className?: string;
-  onItemClick?: (itemId: string) => void;
-  onItemAction?: (itemId: string, actionId: string) => void;
+  onItemClick?: (itemId: string, itemName: string) => void;
+  onActionClick?: (prompt: string) => void;
 }
 
 export const ItemCarousel: FC<ItemCarouselProps> = ({
@@ -16,7 +16,7 @@ export const ItemCarousel: FC<ItemCarouselProps> = ({
   items,
   className,
   onItemClick,
-  onItemAction,
+  onActionClick,
 }) => {
   if (items.length === 0) {
     return (
@@ -49,7 +49,7 @@ export const ItemCarousel: FC<ItemCarouselProps> = ({
           key={item.id}
           item={item}
           onItemClick={onItemClick}
-          onItemAction={onItemAction}
+          onActionClick={onActionClick}
         />
       ))}
     </div>
@@ -58,21 +58,21 @@ export const ItemCarousel: FC<ItemCarouselProps> = ({
 
 interface ItemCardProps {
   item: Item;
-  onItemClick?: (itemId: string) => void;
-  onItemAction?: (itemId: string, actionId: string) => void;
+  onItemClick?: (itemId: string, itemName: string) => void;
+  onActionClick?: (prompt: string) => void;
 }
 
-const ItemCard: FC<ItemCardProps> = ({ item, onItemClick, onItemAction }) => {
+const ItemCard: FC<ItemCardProps> = ({ item, onItemClick, onActionClick }) => {
   const handleCardClick = () => {
     if (onItemClick) {
-      onItemClick(item.id);
+      onItemClick(item.id, item.name);
     }
   };
 
-  const handleActionClick = (actionId: string, e: React.MouseEvent) => {
+  const handleActionClick = (prompt: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onItemAction) {
-      onItemAction(item.id, actionId);
+    if (onActionClick) {
+      onActionClick(prompt);
     }
   };
 
@@ -145,7 +145,7 @@ const ItemCard: FC<ItemCardProps> = ({ item, onItemClick, onItemAction }) => {
                   variant={action.variant || "default"}
                   size="sm"
                   disabled={action.disabled}
-                  onClick={(e) => handleActionClick(action.id, e)}
+                  onClick={(e) => handleActionClick(action.prompt || action.label, e)}
                   className={cn(
                     "min-h-11 w-full px-3",
                     "md:min-h-8",

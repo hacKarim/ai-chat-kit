@@ -22,8 +22,8 @@ export const ThreadList: FC = () => {
       <div className="my-2 border-t border-border/40" />
 
       {/* History Label */}
-      <div className="px-2.5 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        Recent
+      <div className="px-2.5 py-1 text-xs font-light text-muted-foreground uppercase tracking-wider">
+        Discussions Récentes
       </div>
 
       <ThreadListItems />
@@ -50,7 +50,7 @@ const DashboardButton: FC = () => {
       data-active={isActive ? "" : undefined}
     >
       <LayoutDashboard className="size-4" />
-      Home
+      Scenarios
     </Button>
   );
 };
@@ -63,7 +63,7 @@ const ThreadListNew: FC = () => {
         variant="ghost"
       >
         <PlusIcon />
-        New Thread
+        Nouvelle Discussion
       </Button>
     </ThreadListPrimitive.New>
   );
@@ -103,7 +103,7 @@ const ThreadListItem: FC = () => {
   return (
     <ThreadListItemPrimitive.Root
       className="aui-thread-list-item group/archive flex items-center gap-2 rounded-lg transition-all hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-active:bg-muted data-[new-chat=true]:hidden"
-      data-new-chat={title === "New Chat" ? "true" : undefined}
+      data-new-chat={title === "Nouvelle Discussion" ? "true" : undefined}
     >
       <ThreadListItemPrimitive.Trigger className="cursor-pointer aui-thread-list-item-trigger flex-grow px-3 py-2 text-start overflow-hidden">
         <ThreadListItemTitle />

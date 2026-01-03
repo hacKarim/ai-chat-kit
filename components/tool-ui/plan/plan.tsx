@@ -21,7 +21,16 @@ export const Plan: FC<PlanProps> = ({
   className,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const [expandedTodos, setExpandedTodos] = useState<Set<string>>(new Set());
+  // Initialize with all todos that have descriptions expanded by default
+  const [expandedTodos, setExpandedTodos] = useState<Set<string>>(() => {
+    const initialExpanded = new Set<string>();
+    todos.forEach((todo) => {
+      if (todo.description) {
+        initialExpanded.add(todo.id);
+      }
+    });
+    return initialExpanded;
+  });
 
   const completedCount = todos.filter((t) => t.status === "completed").length;
   const progressPercentage = todos.length > 0 ? (completedCount / todos.length) * 100 : 0;
@@ -168,14 +177,7 @@ export const Plan: FC<PlanProps> = ({
         </Button>
       )}
 
-      {/* Celebration Message */}
-      {allCompleted && (
-        <div className="text-center py-2 px-3 bg-yellow-50 dark:bg-yellow-950/20 rounded border border-yellow-200 dark:border-yellow-800">
-          <p className="text-xs font-medium text-yellow-900 dark:text-yellow-100">
-            All tasks completed! Great work! 🎉
-          </p>
-        </div>
-      )}
+      
     </div>
   );
 };

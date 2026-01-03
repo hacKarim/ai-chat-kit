@@ -29,6 +29,7 @@ import { LinkedInPost, parseSerializableLinkedInPost } from "@/components/tool-u
 import { DataTable, parseSerializableDataTable } from "@/components/tool-ui/data-table";
 import { OptionList, parseSerializableOptionList } from "@/components/tool-ui/option-list";
 import { ItemCarousel, parseSerializableItemCarousel } from "@/components/tool-ui/item-carousel";
+import { ItemDetail, parseSerializableItemDetail } from "@/components/tool-ui/item-detail";
 import { Chart, parseSerializableChart } from "@/components/tool-ui/chart";
 import { LinkPreview, parseSerializableLinkPreview } from "@/components/tool-ui/link-preview";
 import { Plan, parseSerializablePlan } from "@/components/tool-ui/plan";
@@ -45,10 +46,11 @@ const remarkSocialPosts: Plugin = () => {
     visit(tree, "code", (node: any, index: number | undefined, parent: any) => {
       const language = node.lang;
       const socialPostTypes = [
-        'x-post', 'twitter-post', 'instagram-post', 'linkedin-post',
-        'data-table', 'option-list', 'item-carousel',
-        'chart', 'link-preview', 'plan', 'image', 'maps', 'dashboard', 'file-download',
-        'record-button', 'next-best-action'
+        'x-post', 'x_post', 'twitter-post', 'twitter_post', 'instagram-post', 'instagram_post', 'linkedin-post', 'linkedin_post',
+        'data-table', 'data_table', 'option-list', 'option_list', 'detect', 'item-carousel', 'item_carousel', 'item-detail', 'item_detail',
+        'chart', 'chart_display', 'link-preview', 'link_preview', 'plan', 'image', 'maps', 'directions', 'dashboard', 'file-download', 'file_download',
+        'record-button', 'record_button', 'next-best-action', 'next_best_action', 'next-action', 'next_action', 'intent_detection', 'social_media',
+        'form'
       ];
 
       if (socialPostTypes.includes(language) && index !== undefined && parent) {
@@ -69,6 +71,29 @@ const remarkSocialPosts: Plugin = () => {
 const preprocessMarkdown = (text: string): string => {
   // Unescape backticks that were escaped in JSON responses
   return text.replace(/\\`/g, '`');
+};
+
+// Attempt to fix common JSON syntax errors
+const sanitizeJSON = (jsonString: string): string => {
+  return jsonString
+    // Remove trailing commas before closing braces/brackets
+    .replace(/,(\s*[}\]])/g, '$1')
+    // Replace unescaped newlines in string values
+    .replace(/: *"([^"]*)\n([^"]*)"([,}\]])/g, (match, before, after, end) => {
+      return `: "${before}\\n${after}"${end}`;
+    })
+    // Remove any literal newlines within quoted strings (convert to \n)
+    .split('\n').map((line, i, arr) => {
+      // Check if we're inside a string by counting quotes
+      if (i === 0) return line;
+      const prevLines = arr.slice(0, i).join('\n');
+      const quoteCount = (prevLines.match(/"/g) || []).length;
+      const isInsideString = quoteCount % 2 !== 0;
+      if (isInsideString) {
+        return '\\n' + line;
+      }
+      return line;
+    }).join('');
 };
 
 const MarkdownTextImpl = ({ text }: { text?: string }) => {
@@ -211,6 +236,30 @@ const InteractiveNextBestAction: FC<{ data: any }> = ({ data }) => {
   return <NextBestAction {...nextBestAction} onActionClick={handleActionClick} />;
 };
 
+// Wrapper component for ItemCarousel that connects to the conversation
+const InteractiveItemCarousel: FC<{ data: any }> = ({ data }) => {
+  const threadRuntime = useThreadRuntime();
+  const carousel = parseSerializableItemCarousel(data);
+
+  const handleItemClick = (itemId: string, itemName: string) => {
+    // Send the item name to the conversation
+    threadRuntime.append({
+      role: "user",
+      content: [{ type: "text", text: itemName }],
+    });
+  };
+
+  const handleActionClick = (prompt: string) => {
+    // Send the prompt to the conversation
+    threadRuntime.append({
+      role: "user",
+      content: [{ type: "text", text: prompt }],
+    });
+  };
+
+  return <ItemCarousel {...carousel} onItemClick={handleItemClick} onActionClick={handleActionClick} />;
+};
+
 const defaultComponents = memoizeMarkdownComponents({
   // Custom renderer for social post blocks
   // @ts-ignore - custom HTML element from remark plugin
@@ -225,12 +274,27 @@ const defaultComponents = memoizeMarkdownComponents({
     try {
       // Decode the content
       const content = decodeURIComponent(atob(encodedContent));
-      const data = JSON.parse(content);
+
+      let data;
+      try {
+        data = JSON.parse(content);
+      } catch (parseError) {
+        // Try to sanitize and fix common JSON issues
+        try {
+          const sanitizedContent = sanitizeJSON(content);
+          data = JSON.parse(sanitizedContent);
+        } catch (secondError) {
+          // Silently fail - return null so component doesn't render
+          return null;
+        }
+      }
 
       // Render based on type
       switch (type) {
         case 'x-post':
+        case 'x_post':
         case 'twitter-post':
+        case 'twitter_post':
           const xPost = parseSerializableXPost(data);
           return (
             <div className="not-prose my-4">
@@ -239,6 +303,7 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'instagram-post':
+        case 'instagram_post':
           const igPost = parseSerializableInstagramPost(data);
           return (
             <div className="not-prose my-4">
@@ -247,6 +312,7 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'linkedin-post':
+        case 'linkedin_post':
           const liPost = parseSerializableLinkedInPost(data);
           return (
             <div className="not-prose my-4">
@@ -254,7 +320,56 @@ const defaultComponents = memoizeMarkdownComponents({
             </div>
           );
 
+        case 'social_media':
+          // Transform social_media format to platform-specific format
+          const platform = data.platform?.toLowerCase();
+          const transformedData = {
+            id: data.id || crypto.randomUUID(),
+            author: data.author || {
+              name: "Acme",
+              handle: data.platform === 'instagram' ? '@acme' : 'acme',
+              avatarUrl: '',
+              verified: true
+            },
+            text: data.caption || data.text || '',
+            media: data.elements?.image_concept ? [{ type: 'image', url: '', alt: data.elements.image_concept }] : undefined,
+            stats: data.stats,
+            createdAt: data.createdAt || new Date().toISOString()
+          };
+
+          // Route to appropriate platform component
+          if (platform === 'instagram') {
+            const igPostFromSM = parseSerializableInstagramPost(transformedData);
+            return (
+              <div className="not-prose my-4">
+                <InstagramPost post={igPostFromSM} />
+              </div>
+            );
+          } else if (platform === 'linkedin') {
+            const liPostFromSM = parseSerializableLinkedInPost(transformedData);
+            return (
+              <div className="not-prose my-4">
+                <LinkedInPost post={liPostFromSM} />
+              </div>
+            );
+          } else if (platform === 'twitter' || platform === 'x') {
+            const xPostFromSM = parseSerializableXPost(transformedData);
+            return (
+              <div className="not-prose my-4">
+                <XPost post={xPostFromSM} />
+              </div>
+            );
+          }
+          // Default to Instagram if platform not specified
+          const defaultPost = parseSerializableInstagramPost(transformedData);
+          return (
+            <div className="not-prose my-4">
+              <InstagramPost post={defaultPost} />
+            </div>
+          );
+
         case 'data-table':
+        case 'data_table':
           const dataTable = parseSerializableDataTable(data);
           return (
             <div className="not-prose my-4">
@@ -263,6 +378,8 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'option-list':
+        case 'option_list':
+        case 'detect':
           return (
             <div className="not-prose my-4">
               <InteractiveOptionList data={data} />
@@ -270,14 +387,24 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'item-carousel':
-          const carousel = parseSerializableItemCarousel(data);
+        case 'item_carousel':
           return (
             <div className="not-prose my-4">
-              <ItemCarousel {...carousel} />
+              <InteractiveItemCarousel data={data} />
+            </div>
+          );
+
+        case 'item-detail':
+        case 'item_detail':
+          const itemDetail = parseSerializableItemDetail(data);
+          return (
+            <div className="not-prose my-4">
+              <ItemDetail {...itemDetail} />
             </div>
           );
 
         case 'chart':
+        case 'chart_display':
           const chart = parseSerializableChart(data);
           return (
             <div className="not-prose my-4">
@@ -286,6 +413,7 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'link-preview':
+        case 'link_preview':
           const linkPreview = parseSerializableLinkPreview(data);
           return (
             <div className="not-prose my-4">
@@ -326,6 +454,7 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'file-download':
+        case 'file_download':
           const fileDownload = parseSerializableFileDownload(data);
           return (
             <div className="not-prose my-4">
@@ -334,6 +463,7 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'record-button':
+        case 'record_button':
           return (
             <div className="not-prose my-4">
               <InteractiveRecordButton data={data} />
@@ -341,16 +471,29 @@ const defaultComponents = memoizeMarkdownComponents({
           );
 
         case 'next-best-action':
+        case 'next_best_action':
+        case 'next-action':
+        case 'next_action':
           return (
             <div className="not-prose my-4">
               <InteractiveNextBestAction data={data} />
             </div>
           );
 
+        case 'intent_detection':
+          // Silent component - metadata only, don't render
+          return null;
+
+        case 'directions':
+          // Silent component - metadata only, don't render
+          // The actual directions are shown via the maps component
+          return null;
+
         default:
           return null;
       }
     } catch (error) {
+      // Silently fail
       return null;
     }
   },
@@ -411,7 +554,7 @@ const defaultComponents = memoizeMarkdownComponents({
   p: ({ className, ...props }) => (
     <p
       className={cn(
-        "aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0 rounded-2xl overflow-hidden",
+        "aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0 rounded overflow-hidden",
         className,
       )}
       {...props}

@@ -5,6 +5,7 @@
 export interface Action {
   id: string;
   label: string;
+  prompt?: string; // The message to send when clicked
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   disabled?: boolean;
 }

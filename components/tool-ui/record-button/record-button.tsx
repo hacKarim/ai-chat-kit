@@ -196,7 +196,7 @@ export const RecordButton: FC<RecordButtonProps> = ({
 
   const getButtonLabel = () => {
     if (isSessionEnded) {
-      return "Record Session Ended";
+      return "Session terminée";
     }
 
     if (isPaused) {

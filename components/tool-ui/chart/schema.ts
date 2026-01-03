@@ -17,6 +17,39 @@ export interface SerializableChart {
 }
 
 export function parseSerializableChart(data: any): SerializableChart {
+  // Check if data is in the dataSeries format with x/y objects
+  if (data.dataSeries?.[0]?.data?.[0]?.x !== undefined) {
+    // Transform dataSeries[].data[{x,y}] format to expected format
+    const firstSeries = data.dataSeries[0];
+    const xValues = firstSeries.data.map((point: any) => point.x);
+    const transformedData: Record<string, any>[] = xValues.map((xVal: any, index: number) => {
+      const row: Record<string, any> = { x: xVal };
+      data.dataSeries.forEach((s: any, seriesIndex: number) => {
+        const key = `series${seriesIndex}`;
+        row[key] = s.data?.[index]?.y;
+      });
+      return row;
+    });
+
+    const transformedSeries: ChartSeries[] = data.dataSeries.map((s: any, index: number) => ({
+      key: `series${index}`,
+      label: s.name || s.label || `Series ${index + 1}`,
+      color: s.color,
+    }));
+
+    return {
+      id: data.id || crypto.randomUUID(),
+      type: data.type || "bar",
+      title: data.title,
+      description: data.description,
+      data: transformedData,
+      xKey: "x",
+      series: transformedSeries,
+      showLegend: data.showLegend ?? true,
+      showGrid: data.showGrid ?? true,
+    };
+  }
+
   // Check if data is in the alternative format with xAxis.categories and series[].data
   if (data.xAxis?.categories && data.series?.[0]?.data) {
     // Transform xAxis.categories + series[].data format to expected format
@@ -105,6 +138,39 @@ export function parseSerializableChart(data: any): SerializableChart {
       type: data.type || "bar",
       title: data.title,
       description: data.description,
+      data: transformedData,
+      xKey: "x",
+      series: transformedSeries,
+      showLegend: data.showLegend ?? true,
+      showGrid: data.showGrid ?? true,
+    };
+  }
+
+  // Check if data is in the series[].data[{x, y}] format (similar to dataSeries but uses 'series')
+  if (data.series?.[0]?.data?.[0]?.x !== undefined) {
+    // Transform series[].data[{x,y}] format to expected format
+    const firstSeries = data.series[0];
+    const xValues = firstSeries.data.map((point: any) => point.x);
+    const transformedData: Record<string, any>[] = xValues.map((xVal: any, index: number) => {
+      const row: Record<string, any> = { x: xVal };
+      data.series.forEach((s: any, seriesIndex: number) => {
+        const key = `series${seriesIndex}`;
+        row[key] = s.data?.[index]?.y;
+      });
+      return row;
+    });
+
+    const transformedSeries: ChartSeries[] = data.series.map((s: any, index: number) => ({
+      key: `series${index}`,
+      label: s.name || s.label || `Series ${index + 1}`,
+      color: s.color,
+    }));
+
+    return {
+      id: data.id || crypto.randomUUID(),
+      type: data.type || data.series?.[0]?.type || "bar",
+      title: data.title || data.xAxisTitle,
+      description: data.description || data.yAxisTitle,
       data: transformedData,
       xKey: "x",
       series: transformedSeries,

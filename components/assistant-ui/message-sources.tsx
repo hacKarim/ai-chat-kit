@@ -61,7 +61,7 @@ export const MessageSources: FC<MessageSourcesProps> = ({ sources }) => {
           variant="outline"
           size="sm"
           className={cn(
-            "h-7 rounded-full px-1 py-1 text-xs font-semibold gap-1.5",
+            "h-7 rounded-full px-2.5 py-1 text-xs font-semibold gap-1.5",
             "hover:bg-token-main-surface-secondary transition-colors cursor-pointer",
             "border-token-border-default bg-token-main-surface-primary",
             "mt-0 mb-0"

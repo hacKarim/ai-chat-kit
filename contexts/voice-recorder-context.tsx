@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type FC, type ReactNode } from "react";
+import { createContext, useContext, type FC, type ReactNode, type RefObject } from "react";
 import { useVoiceRecorder, type RecordingState } from "@/hooks/use-voice-recorder";
 
 interface VoiceRecorderContextType {
@@ -14,6 +14,8 @@ interface VoiceRecorderContextType {
   pauseListening: () => void;
   resumeListening: () => void;
   hasRecording: boolean;
+  audioContextRef: RefObject<AudioContext | null>;
+  analyserRef: RefObject<AnalyserNode | null>;
 }
 
 const VoiceRecorderContext = createContext<VoiceRecorderContextType | null>(null);

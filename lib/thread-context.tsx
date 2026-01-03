@@ -71,7 +71,7 @@ export function ThreadProvider({
           const defaultThread: ThreadData = {
             threadId: newThreadId,
             conversationId: null,
-            title: "New Chat",
+            title: "Nouvelle Discussion",
             messages: [],
             status: "regular",
           };
@@ -89,7 +89,7 @@ export function ThreadProvider({
           const defaultThread: ThreadData = {
             threadId: newThreadId,
             conversationId: null,
-            title: "New Chat",
+            title: "Nouvelle Discussion",
             messages: [],
             status: "regular",
           };
@@ -108,7 +108,7 @@ export function ThreadProvider({
         const defaultThread: ThreadData = {
           threadId: newThreadId,
           conversationId: null,
-          title: "New Chat",
+          title: "Nouvelle Discussion",
           messages: [],
           status: "regular",
         };
@@ -144,7 +144,7 @@ export function ThreadProvider({
           newThreads.set(targetThreadId, {
             threadId: targetThreadId,
             conversationId: null,
-            title: "New Chat",
+            title: "Nouvelle Discussion",
             messages: [],
             status: "regular",
           });
@@ -156,7 +156,7 @@ export function ThreadProvider({
         newThreads.set(targetThreadId, {
           threadId: targetThreadId,
           conversationId: null,
-          title: "New Chat",
+          title: "Nouvelle Discussion",
           messages: [],
           status: "regular",
         });
@@ -173,7 +173,7 @@ export function ThreadProvider({
         const defaultThread: ThreadData = {
           threadId: newThreadId,
           conversationId: null,
-          title: "New Chat",
+          title: "Nouvelle Discussion",
           messages: [],
           status: "regular",
         };
@@ -207,4 +207,12 @@ export function useThreadContext() {
     throw new Error("useThreadContext must be used within ThreadProvider");
   }
   return context;
+}
+
+/**
+ * Optional version of useThreadContext that returns null if not within a ThreadProvider
+ * Useful for components that need to work both inside and outside the provider
+ */
+export function useThreadContextOptional() {
+  return useContext(ThreadContext);
 }

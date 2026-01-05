@@ -2,7 +2,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 export type RecordingState = "idle" | "listening" | "recording" | "processing";
 
-export function useVoiceRecorder(onVoiceDetected?: () => void) {
+export type Transcribe = (audio: File) => Promise<string>;
+
+export function useVoiceRecorder(onVoiceDetected?: () => void, transcribe?: Transcribe) {
+  const transcribeRef = useRef(transcribe);
+  transcribeRef.current = transcribe;
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -23,7 +27,7 @@ export function useVoiceRecorder(onVoiceDetected?: () => void) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Try different formats in order of Dify compatibility
+      // Try formats most speech-to-text services accept, in order
       let mimeType = "audio/mp4";
       let fileExtension = "m4a";
 
@@ -89,33 +93,19 @@ export function useVoiceRecorder(onVoiceDetected?: () => void) {
       setRecordingState("processing");
 
       try {
-        const formData = new FormData();
+        if (!transcribeRef.current) {
+          throw new Error("No transcribe adapter configured");
+        }
 
-        // Get the file extension that was stored during recording
         const extension = (audioBlob as any).__fileExtension || "m4a";
-
-        // Send audio to server - server will convert to MP3 if needed
-        const fileToSend = new File([audioBlob], `recording.${extension}`, {
+        const file = new File([audioBlob], `recording.${extension}`, {
           type: audioBlob.type,
         });
 
-        formData.append("file", fileToSend);
-        formData.append("user", "user");
+        const text = await transcribeRef.current(file);
 
-        const response = await fetch("/api/audio-to-text", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-          throw new Error(errorData.error || "Transcription failed");
-        }
-
-        const data = await response.json();
-
-        if (data.text) {
-          onTranscription(data.text);
+        if (text) {
+          onTranscription(text);
         }
 
         setAudioBlob(null);
@@ -162,7 +152,7 @@ export function useVoiceRecorder(onVoiceDetected?: () => void) {
   // Helper: Start recording with existing stream
   const startRecordingWithStream = useCallback(async (stream: MediaStream) => {
     try {
-      // Try different formats in order of Dify compatibility
+      // Try different formats most speech-to-text services accept, in order
       let mimeType = "audio/mp4";
       let fileExtension = "m4a";
 

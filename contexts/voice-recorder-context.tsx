@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, type FC, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, type ReactNode, type RefObject } from "react";
 import { useVoiceRecorder, type RecordingState } from "@/hooks/use-voice-recorder";
+import { useChatKit } from "@/lib/chat-kit";
 
 interface VoiceRecorderContextType {
   recordingState: RecordingState;
@@ -27,7 +28,8 @@ export function VoiceRecorderProvider({
   children: ReactNode;
   onVoiceDetected?: () => void;
 }) {
-  const recorder = useVoiceRecorder(onVoiceDetected);
+  const { transcribe } = useChatKit();
+  const recorder = useVoiceRecorder(onVoiceDetected, transcribe);
 
   return (
     <VoiceRecorderContext.Provider value={recorder}>

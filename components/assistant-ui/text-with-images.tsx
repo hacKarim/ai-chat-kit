@@ -90,7 +90,7 @@ function TextWithImagesImpl({ text }: TextWithImagesProps) {
             <div key={`${segment.imageProps.src}-${index}`} className="my-4">
               <Image
                 id={`workflow-image-${index}`}
-                assetId={`workflow-${Date.now()}-${index}`}
+                assetId={`workflow-image-${index}`}
                 src={segment.imageProps.src}
                 alt={segment.imageProps.alt || "Workflow generated image"}
                 title={segment.imageProps.title}

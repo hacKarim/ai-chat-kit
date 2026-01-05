@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { WorkflowState, NodeStatus } from "@/lib/dify/types";
+import { WorkflowState, NodeStatus } from "@/lib/types";
 import { CheckCircle2, Circle, Loader2, XCircle, Clock, CircleDotDashed, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -34,13 +36,15 @@ import * as m from "motion/react-m";
 interface AudioPlayerContextType {
   currentlyPlayingMessageId: string | null;
   isPlaying: (messageId: string) => boolean;
-  play: (messageId: string, difyMessageId: string) => Promise<void>;
+  canPlay: boolean;
+  play: (messageId: string) => Promise<void>;
   stop: () => void;
 }
 
 const AudioPlayerContext = createContext<AudioPlayerContextType>({
   currentlyPlayingMessageId: null,
   isPlaying: () => false,
+  canPlay: false,
   play: async () => {},
   stop: () => {},
 });
@@ -64,10 +68,9 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
-import { WorkflowStreamButton } from "@/components/assistant-ui/workflow-stream";
 import { WorkflowStatus } from "@/components/workflow-status";
-import type { WorkflowState, RetrieverResource } from "@/lib/dify/types";
-import { getOrCreateSessionId } from "@/lib/session";
+import type { WorkflowState, Source } from "@/lib/types";
+import { useChatKit } from "@/lib/chat-kit";
 import { VoiceRecorder } from "@/components/assistant-ui/voice-recorder";
 import { MessageSources } from "@/components/assistant-ui/message-sources";
 import { VoiceRecorderProvider, useVoiceRecorderContext } from "@/contexts/voice-recorder-context";
@@ -78,6 +81,7 @@ import { cn } from "@/lib/utils";
 export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void }> = ({
   onListeningModeChange
 }) => {
+  const { synthesize } = useChatKit();
   const [isListeningMode, setIsListeningMode] = useState(false);
   const [currentlyPlayingMessageId, setCurrentlyPlayingMessageId] = useState<string | null>(null);
   const [lastAutoPlayedMessageId, setLastAutoPlayedMessageId] = useState<string | null>(null);
@@ -135,7 +139,11 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
 
     isPlaying: (messageId: string) => currentlyPlayingMessageId === messageId,
 
-    play: async (messageId: string, difyMessageId: string) => {
+    canPlay: !!synthesize,
+
+    play: async (messageId: string) => {
+      if (!synthesize) return;
+
       // Stop any currently playing audio first
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -144,127 +152,30 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
       }
 
       try {
-        const sessionId = getOrCreateSessionId();
-
-        // Get the message text content for chunking
-        const messageElement = document.querySelector(`[data-message-id="${difyMessageId}"]`);
+        // Read the rendered text of the message
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
         const messageContent = messageElement?.querySelector('.aui-assistant-message-content');
         const messageText = messageContent?.textContent?.trim() || '';
+        if (!messageText) return;
 
-        // Split into chunks if text is long (> 500 chars)
-        const shouldChunk = messageText.length > 500;
-        const chunks = shouldChunk ? splitIntoChunks(messageText) : [];
-
+        // Long answers are synthesized sentence group by sentence group,
+        // so the first words play while the rest is still being generated
+        const chunks = splitIntoChunks(messageText);
         shouldStopPlaybackRef.current = false;
 
-        // If chunking, play chunks sequentially
-        if (shouldChunk && chunks.length > 0) {
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-
-            // Check if playback was stopped
-            if (shouldStopPlaybackRef.current) {
-              break;
-            }
-
-            const response = await fetch("/api/text-to-audio", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Session-Id": sessionId,
-              },
-              body: JSON.stringify({
-                text: chunk, // Send only text when chunking
-                user: sessionId,
-              }),
-            });
-
-            if (!response.ok) {
-              const error = await response.json().catch(() => ({ error: "Unknown error" }));
-              throw new Error(error.error || "Failed to generate audio");
-            }
-
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            // Create and play audio for this chunk
-            const audio = new Audio(audioUrl);
-            audio.playbackRate = 1.2; // Play 10% faster
-            currentAudioRef.current = audio;
-
-            // Set up audio visualization for TTS
-            if (!ttsAudioContextRef.current) {
-              ttsAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-              ttsAnalyserRef.current = ttsAudioContextRef.current.createAnalyser();
-              ttsAnalyserRef.current.fftSize = 256;
-              ttsAnalyserRef.current.smoothingTimeConstant = 0.8;
-            }
-
-            // Disconnect previous source if it exists
-            if (ttsSourceRef.current) {
-              try {
-                ttsSourceRef.current.disconnect();
-              } catch (e) {
-                // Ignore if already disconnected
-              }
-            }
-
-            // Create new source and connect to analyser for this audio element
-            if (ttsAudioContextRef.current && ttsAnalyserRef.current) {
-              ttsSourceRef.current = ttsAudioContextRef.current.createMediaElementSource(audio);
-              ttsSourceRef.current.connect(ttsAnalyserRef.current);
-              ttsAnalyserRef.current.connect(ttsAudioContextRef.current.destination);
-            }
-
-            // Wait for chunk to finish playing before continuing
-            await new Promise<void>((resolve, reject) => {
-              audio.onplay = () => {
-                setCurrentlyPlayingMessageId(messageId);
-              };
-
-              audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                resolve();
-              };
-
-              audio.onerror = () => {
-                URL.revokeObjectURL(audioUrl);
-                setCurrentlyPlayingMessageId(null);
-                currentAudioRef.current = null;
-                reject(new Error('Audio playback error'));
-              };
-
-              audio.play().catch(reject);
-            });
-          }
-        } else {
-          // For short messages, use message_id as before
-          const response = await fetch("/api/text-to-audio", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Session-Id": sessionId,
-            },
-            body: JSON.stringify({
-              message_id: difyMessageId,
-              user: sessionId,
-            }),
-          });
-
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: "Unknown error" }));
-            console.error('[AUDIO] TTS API error:', response.status, error);
-            throw new Error(error.error || "Failed to generate audio");
+        for (const chunk of chunks) {
+          if (shouldStopPlaybackRef.current) {
+            break;
           }
 
-          const audioBlob = await response.blob();
+          const audioBlob = await synthesize(chunk);
           const audioUrl = URL.createObjectURL(audioBlob);
 
           const audio = new Audio(audioUrl);
-          audio.playbackRate = 1.2; // Play 10% faster
+          audio.playbackRate = 1.2;
           currentAudioRef.current = audio;
 
-          // Set up audio visualization for TTS
+          // Feed the voice visual with the spoken audio
           if (!ttsAudioContextRef.current) {
             ttsAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             ttsAnalyserRef.current = ttsAudioContextRef.current.createAnalyser();
@@ -272,46 +183,42 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
             ttsAnalyserRef.current.smoothingTimeConstant = 0.8;
           }
 
-          // Disconnect previous source if it exists
           if (ttsSourceRef.current) {
             try {
               ttsSourceRef.current.disconnect();
             } catch (e) {
-              // Ignore if already disconnected
+              // Already disconnected
             }
           }
 
-          // Create new source and connect to analyser for this audio element
           if (ttsAudioContextRef.current && ttsAnalyserRef.current) {
             ttsSourceRef.current = ttsAudioContextRef.current.createMediaElementSource(audio);
             ttsSourceRef.current.connect(ttsAnalyserRef.current);
             ttsAnalyserRef.current.connect(ttsAudioContextRef.current.destination);
           }
 
-          audio.onplay = () => {
-            setCurrentlyPlayingMessageId(messageId);
-          };
+          // Wait for this chunk to finish before the next one
+          await new Promise<void>((resolve, reject) => {
+            audio.onplay = () => {
+              setCurrentlyPlayingMessageId(messageId);
+            };
 
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            setCurrentlyPlayingMessageId(null);
-            currentAudioRef.current = null;
-          };
+            audio.onended = () => {
+              URL.revokeObjectURL(audioUrl);
+              resolve();
+            };
 
-          audio.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            setCurrentlyPlayingMessageId(null);
-            currentAudioRef.current = null;
-          };
+            audio.onerror = () => {
+              URL.revokeObjectURL(audioUrl);
+              reject(new Error('Audio playback error'));
+            };
 
-          await audio.play();
+            audio.play().catch(reject);
+          });
         }
 
-        // All chunks finished (only for chunked playback)
-        if (shouldChunk) {
-          setCurrentlyPlayingMessageId(null);
-          currentAudioRef.current = null;
-        }
+        setCurrentlyPlayingMessageId(null);
+        currentAudioRef.current = null;
       } catch (error) {
         setCurrentlyPlayingMessageId(null);
         currentAudioRef.current = null;
@@ -351,18 +258,18 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
       }
 
       const lastMessage = assistantMessages[assistantMessages.length - 1];
-      const difyMessageId = lastMessage.getAttribute('data-message-id');
+      const completedId = lastMessage.getAttribute('data-message-id');
 
-      // Only proceed if we have a dify message ID
-      if (!difyMessageId) {
+      // The attribute only appears once the message has finished streaming
+      if (!completedId) {
         return;
       }
 
       // Check if this is a NEW message (different from the last one we knew about)
-      const isNewMessage = difyMessageId !== lastKnownMessageIdRef.current;
+      const isNewMessage = completedId !== lastKnownMessageIdRef.current;
 
       // Update our tracking of the last known message
-      lastKnownMessageIdRef.current = difyMessageId;
+      lastKnownMessageIdRef.current = completedId;
 
       // Only auto-play if this is a NEW message
       if (!isNewMessage) {
@@ -370,7 +277,7 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
       }
 
       // Check if this message has already been auto-played (extra safety)
-      if (difyMessageId === lastAutoPlayedMessageId) {
+      if (completedId === lastAutoPlayedMessageId) {
         return;
       }
 
@@ -381,10 +288,10 @@ export const Thread: FC<{ onListeningModeChange?: (isListening: boolean) => void
       }
 
       // Mark this message as auto-played and play immediately
-      setLastAutoPlayedMessageId(difyMessageId);
+      setLastAutoPlayedMessageId(completedId);
 
       // Play audio immediately - no delay needed
-      audioPlayer.play(difyMessageId, difyMessageId).catch(() => {
+      audioPlayer.play(completedId).catch(() => {
         // Silent error handling for auto-play
       });
     };
@@ -610,6 +517,8 @@ const ThreadScrollToBottom: FC = () => {
 };
 
 const ThreadWelcome: FC = () => {
+  const { welcome } = useChatKit();
+
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
       <div className="aui-thread-welcome-center flex w-full flex-grow flex-col items-center justify-center">
@@ -621,17 +530,19 @@ const ThreadWelcome: FC = () => {
             transition={{ delay: 0.5 }}
             className="aui-thread-welcome-message-motion-1 text-2xl font-semibold"
           >
-            Hello, how can I help?
+            {welcome?.title}
           </m.div>
-          <m.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ delay: 0.6 }}
-            className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
-          >
-            Comment puis-je vous aider aujourd'hui ?
-          </m.div>
+          {welcome?.subtitle && (
+            <m.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ delay: 0.6 }}
+              className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
+            >
+              {welcome.subtitle}
+            </m.div>
+          )}
         </div>
       </div>
       <ThreadSuggestions />
@@ -640,55 +551,29 @@ const ThreadWelcome: FC = () => {
 };
 
 const ThreadSuggestions: FC = () => {
+  const { starters = [] } = useChatKit();
+
+  if (starters.length === 0) return null;
+
   return (
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 pb-4 @md:grid-cols-2">
-      {[
-        {
-          title: "Répondre à",
-          label: "une question client",
-          action: "J'ai besoin d'aide pour répondre à un client",
-        },
-        {
-          title: "Lancer une formation",
-          label: "sur les produits",
-          action: "Lancer une session de formation",
-        },
-        {
-          title: "Préparer",
-          label: "mon prochain rendez-vous",
-          action: "Préparer mon prochain rendez-vous",
-        },
-        {
-          title: "Voir le planning",
-          label: "des visites clients",
-          action: "Quelles sont mes prochaines visites clients ?",
-        },
-      ].map((suggestedAction, index) => (
+      {starters.map((starter, index) => (
         <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ delay: 0.5 + 0.05 * index }}
-          key={`suggested-action-${suggestedAction.title}-${index}`}
+          key={`starter-${starter.title}-${index}`}
           className="aui-thread-welcome-suggestion-display [&:nth-child(n+3)]:hidden @md:[&:nth-child(n+3)]:block"
         >
-          <ThreadPrimitive.Suggestion
-            prompt={suggestedAction.action}
-            send
-            asChild
-          >
+          <ThreadPrimitive.Suggestion prompt={starter.prompt} send asChild>
             <button
-              style={{ backgroundColor: '#EFF2F5' }}
-              className="group relative flex w-full h-[-webkit-fill-available] cursor-pointer rounded-3xl text-left transition-all duration-300 ease-in-out hover:brightness-95 min-h-[140px] flex-col items-start justify-between px-6 py-8"
-              aria-label={suggestedAction.action}
+              className="group relative flex min-h-[140px] w-full cursor-pointer flex-col items-start justify-between rounded-3xl bg-muted px-6 py-8 text-left transition-all duration-300 ease-in-out hover:brightness-95"
+              aria-label={starter.prompt}
             >
               <div className="flex flex-col gap-1">
-                <span className="text-lg font-semibold">
-                  {suggestedAction.title}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {suggestedAction.label}
-                </span>
+                <span className="text-lg font-semibold">{starter.title}</span>
+                <span className="text-sm text-muted-foreground">{starter.label}</span>
               </div>
             </button>
           </ThreadPrimitive.Suggestion>
@@ -700,39 +585,42 @@ const ThreadSuggestions: FC = () => {
 
 const MessageSuggestions: FC<{
   messageId?: string;
+  inline?: string[];
   onSuggestionClick?: () => void;
-}> = ({ messageId, onSuggestionClick }) => {
+}> = ({ messageId, inline, onSuggestionClick }) => {
+  const { getSuggestions } = useChatKit();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!messageId) {
+    // Suggestions shipped with the message win over the adapter
+    if (inline && inline.length > 0) {
+      setSuggestions(inline);
+      return;
+    }
+
+    if (!messageId || !getSuggestions) {
       setSuggestions([]);
       return;
     }
 
-    const fetchSuggestions = async () => {
-      setIsLoading(true);
-      try {
-        const sessionId = getOrCreateSessionId();
-        const response = await fetch(`/api/suggestions/${messageId}`, {
-          headers: {
-            "X-Session-Id": sessionId,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSuggestions(data.data || []);
-        }
-      } catch (error) {
-        // Silent error handling
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    let cancelled = false;
+    setIsLoading(true);
+    getSuggestions(messageId)
+      .then((result) => {
+        if (!cancelled) setSuggestions(result || []);
+      })
+      .catch(() => {
+        // Suggestions are optional, stay quiet
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-    fetchSuggestions();
-  }, [messageId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [messageId, inline, getSuggestions]);
 
   const handleSuggestionClick = useCallback(() => {
     setSuggestions([]);
@@ -775,95 +663,26 @@ const MessageSuggestions: FC<{
 };
 
 const Composer: FC = () => {
-  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  const { placeholder } = useChatKit();
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [hasConversation, setHasConversation] = useState(false);
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
-  // Get thread state directly from assistant-ui runtime (no DOM polling!)
   const thread = useThread();
   const messages = thread.messages;
 
-  // Get the last assistant message ID from the thread state
+  // Follow-ups belong to the last assistant message
+  const lastAssistant = messages.filter((msg) => msg.role === "assistant").at(-1);
+  const lastMessageId = lastAssistant?.id ?? null;
+  const hasConversation = !!lastAssistant;
+  const inlineSuggestions = (
+    lastAssistant?.content.find(
+      (part: any) => part.type === "data" && part.name === "suggestions"
+    ) as any
+  )?.data as string[] | undefined;
+
+  // A new assistant message brings its suggestions back
   useEffect(() => {
-    // Get conversation ID from URL
-    const pathParts = window.location.pathname.split('/');
-    const conversationIdFromUrl = pathParts[pathParts.length - 1];
-    const isValidConversationId = conversationIdFromUrl && conversationIdFromUrl !== '' && conversationIdFromUrl !== 'assistant';
-
-    // If conversation ID changed, reset suggestions
-    if (isValidConversationId && conversationIdFromUrl !== currentConversationId) {
-      setCurrentConversationId(conversationIdFromUrl);
-      setLastMessageId(null);
-      setShowSuggestions(true);
-    } else if (!isValidConversationId && currentConversationId !== null) {
-      // New conversation (no ID in URL)
-      setCurrentConversationId(null);
-      setLastMessageId(null);
-      setHasConversation(false);
-    }
-
-    // Get assistant messages from thread state (no DOM queries!)
-    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
-
-    // Only show suggestions if there's at least one assistant message (conversation started)
-    if (assistantMessages.length > 0) {
-      setHasConversation(true);
-      // Get the last assistant message
-      const lastAssistant = assistantMessages[assistantMessages.length - 1];
-      const messageId = lastAssistant.id;
-
-      // Check if it's a dify message ID in the content
-      let difyMessageId: string | undefined;
-      if (Array.isArray(lastAssistant.content)) {
-        const dataPart = lastAssistant.content.find((part: any) =>
-          part.type === 'data' && part.data?.difyMessageId
-        ) as any;
-        difyMessageId = dataPart?.data?.difyMessageId;
-      }
-
-      // If no dify message ID in content, try to extract from messageId
-      // Handle pattern: msg-{uuid}-assistant -> extract {uuid}
-      let finalMessageId = difyMessageId;
-      if (!finalMessageId && messageId && typeof messageId === 'string') {
-        const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
-        if (match && match[1] && match[1].includes("-")) {
-          // If it looks like a UUID (contains hyphens), use it
-          finalMessageId = match[1];
-        } else {
-          // Fallback to original messageId
-          finalMessageId = messageId;
-        }
-      }
-
-      if (finalMessageId && finalMessageId !== lastMessageId) {
-        setLastMessageId(finalMessageId);
-        setShowSuggestions(true);
-      }
-    } else {
-      // No assistant messages yet - hide suggestions
-      setHasConversation(false);
-      setLastMessageId(null);
-    }
-  }, [messages, currentConversationId, lastMessageId]);
-
-  // Listen for URL changes (when switching conversations)
-  useEffect(() => {
-    const handleUrlChange = () => {
-      const pathParts = window.location.pathname.split('/');
-      const conversationIdFromUrl = pathParts[pathParts.length - 1];
-      const isValidConversationId = conversationIdFromUrl && conversationIdFromUrl !== '' && conversationIdFromUrl !== 'assistant';
-
-      if (isValidConversationId && conversationIdFromUrl !== currentConversationId) {
-        setCurrentConversationId(conversationIdFromUrl);
-        setLastMessageId(null);
-        setShowSuggestions(true);
-      }
-    };
-
-    window.addEventListener('popstate', handleUrlChange);
-    return () => window.removeEventListener('popstate', handleUrlChange);
-  }, [currentConversationId]);
+    setShowSuggestions(true);
+  }, [lastMessageId]);
 
   const handleSend = useCallback(() => {
     setShowSuggestions(false);
@@ -878,7 +697,7 @@ const Composer: FC = () => {
           <ComposerAttachments />
 
           <ComposerPrimitive.Input
-            placeholder="Envoyer un message..."
+            placeholder={placeholder}
             className="aui-composer-input max-h-32 min-h-12 w-full resize-none bg-transparent px-3.5 pt-1.5  text-base outline-none placeholder:text-muted-foreground focus-visible:ring-0"
             rows={1}
             autoFocus
@@ -889,6 +708,7 @@ const Composer: FC = () => {
           <ComposerSuggestions
             showSuggestions={showSuggestions}
             lastMessageId={lastMessageId}
+            inline={inlineSuggestions}
             hasConversation={hasConversation}
             onSuggestionClick={() => setShowSuggestions(false)}
           />
@@ -905,9 +725,10 @@ const Composer: FC = () => {
 const ComposerSuggestions: FC<{
   showSuggestions: boolean;
   lastMessageId: string | null;
+  inline?: string[];
   hasConversation: boolean;
   onSuggestionClick: () => void;
-}> = ({ showSuggestions, lastMessageId, hasConversation, onSuggestionClick }) => {
+}> = ({ showSuggestions, lastMessageId, inline, hasConversation, onSuggestionClick }) => {
   const [hasInputText, setHasInputText] = useState(false);
   const [hasAttachments, setHasAttachments] = useState(false);
 
@@ -950,6 +771,7 @@ const ComposerSuggestions: FC<{
     <div className="px-2 sm:px-3.5 pb-2">
       <MessageSuggestions
         messageId={lastMessageId}
+        inline={inline}
         onSuggestionClick={onSuggestionClick}
       />
     </div>
@@ -959,6 +781,8 @@ const ComposerSuggestions: FC<{
 const ComposerInnerAction: FC<{
   onSend?: () => void;
 }> = ({ onSend }) => {
+  const { transcribe } = useChatKit();
+
   // Get the thread runtime to append messages
   const threadRuntime = useThreadRuntime();
 
@@ -993,7 +817,6 @@ const ComposerInnerAction: FC<{
       transcribedTextRef.current = "";
 
       // Use the thread runtime to append the message
-      // This will trigger the onNew handler in assistant.tsx
       threadRuntime.append({
         role: "user",
         content: [{ type: "text", text: message }],
@@ -1010,18 +833,19 @@ const ComposerInnerAction: FC<{
     <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <ComposerAddAttachment />
-        <WorkflowStreamButton />
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Keep VoiceRecorder mounted, but pass running state to pause/resume */}
-        <VoiceRecorder
-          onTranscription={handleTranscription}
-          onAutoSend={handleAutoSend}
-          onRecordingStart={audioPlayer.stop}
-          isThreadRunning={isRunning}
-          isAudioPlaying={!!audioPlayer.currentlyPlayingMessageId}
-        />
+        {/* Voice needs a transcribe adapter. Kept mounted so hands-free mode can pause and resume. */}
+        {transcribe && (
+          <VoiceRecorder
+            onTranscription={handleTranscription}
+            onAutoSend={handleAutoSend}
+            onRecordingStart={audioPlayer.stop}
+            isThreadRunning={isRunning}
+            isAudioPlaying={!!audioPlayer.currentlyPlayingMessageId}
+          />
+        )}
 
         <ThreadPrimitive.If running={false}>
           <ComposerPrimitive.Send asChild>
@@ -1068,97 +892,27 @@ const MessageError: FC = () => {
   );
 };
 
+// Reads a named data part from the current message
+const useDataPart = <T,>(name: string): T | null => {
+  const message = useMessage();
+  const part = message?.content?.find(
+    (p: any) => p.type === "data" && p.name === name
+  ) as any;
+  return (part?.data as T) ?? null;
+};
+
 const AssistantMessage: FC = () => {
   const message = useMessage();
-  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
-  const [difyMessageId, setDifyMessageId] = useState<string | null>(null);
-  const [sources, setSources] = useState<RetrieverResource[] | null>(null);
-
-  // Extract workflow events from message data parts
-  useEffect(() => {
-    // Safety check - ensure message and content exist
-    if (!message?.content) {
-      return;
-    }
-
-    // Look for workflow events in message parts
-    const dataParts = message.content.filter(
-      (part: any) => part.type === "data" && part.data?.workflowEvent
-    );
-
-    if (dataParts.length > 0) {
-      // Get the latest workflow event
-      const latestEvent = dataParts[dataParts.length - 1] as any;
-      const workflowEvent = latestEvent.data.workflowEvent;
-
-      // Update workflow state based on event type
-      setWorkflowState((prev) => {
-        // If no previous state or this is a new workflow, use the event state
-        if (!prev || workflowEvent.type === "workflow_started") {
-          return {
-            workflowRunId: workflowEvent.workflowRunId,
-            workflowId: workflowEvent.workflowId,
-            status: workflowEvent.status,
-            currentNode: workflowEvent.currentNode || null,
-            nodes: workflowEvent.nodes || [],
-            totalSteps: workflowEvent.totalSteps || 0,
-            completedSteps: workflowEvent.completedSteps || 0,
-            elapsedTime: workflowEvent.elapsedTime || 0,
-            startedAt: workflowEvent.startedAt || null,
-            finishedAt: workflowEvent.finishedAt || null,
-          };
-        }
-
-        // Update existing state
-        return {
-          ...prev,
-          status: workflowEvent.status || prev.status,
-          currentNode: workflowEvent.currentNode ?? prev.currentNode,
-          nodes: workflowEvent.nodes || prev.nodes,
-          totalSteps: workflowEvent.totalSteps || prev.totalSteps,
-          completedSteps: workflowEvent.completedSteps || prev.completedSteps,
-          elapsedTime: workflowEvent.elapsedTime || prev.elapsedTime,
-          finishedAt: workflowEvent.finishedAt || prev.finishedAt,
-        };
-      });
-    }
-
-    // Extract Dify message ID from message data parts
-    const messageData = message.content.find(
-      (part: any) => part.type === "data" && part.data?.difyMessageId
-    );
-    if (messageData) {
-      setDifyMessageId((messageData as any).data.difyMessageId);
-    } else {
-      // Try to extract from message ID if it follows the pattern msg-{difyId}-assistant
-      const messageId = (message as any).id;
-      if (messageId && typeof messageId === "string") {
-        const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
-        if (match && match[1] && match[1].includes("-")) {
-          // If it looks like a UUID (contains hyphens), use it
-          setDifyMessageId(match[1]);
-        }
-      }
-    }
-
-    // Extract retriever resources from message data parts
-    const sourcesData = message.content.find(
-      (part: any) => part.type === "data" && part.data?.retrieverResources
-    );
-    if (sourcesData) {
-      const retrieverResources = (sourcesData as any).data.retrieverResources;
-      setSources(retrieverResources);
-    } else {
-      setSources(null);
-    }
-  }, [message?.content, message]);
+  const workflowState = useDataPart<WorkflowState>("workflow");
+  const sources = useDataPart<Source[]>("sources");
+  const isDone = message.status?.type !== "running";
 
   return (
     <MessagePrimitive.Root asChild>
       <div
         className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
         data-role="assistant"
-        data-message-id={difyMessageId || undefined}
+        data-message-id={isDone ? message.id : undefined}
       >
         {/* Display workflow status if available */}
         {workflowState && (
@@ -1202,60 +956,31 @@ const TextToSpeechButton: FC = () => {
   const audioPlayer = useContext(AudioPlayerContext);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Extract message IDs
-  const messageId = (message as any)?.id || null;
-  const difyMessageId = (() => {
-    if (!message?.content) return null;
-
-    const messageData = message.content.find(
-      (part: any) => part.type === "data" && part.data?.difyMessageId
-    );
-
-    if (messageData) {
-      return (messageData as any).data.difyMessageId;
-    }
-
-    // Try to extract from message ID if it follows the pattern msg-{difyId}-assistant
-    if (messageId && typeof messageId === "string") {
-      const match = messageId.match(/^msg-(.+)-(assistant|user)$/);
-      if (match && match[1] && match[1].includes("-")) {
-        return match[1];
-      }
-    }
-
-    return null;
-  })();
-
-  const isPlaying = audioPlayer.isPlaying(difyMessageId);
+  const messageId = message.id;
+  const isPlaying = audioPlayer.isPlaying(messageId);
 
   const handlePlayAudio = async () => {
-    if (!difyMessageId) {
-      return;
-    }
-
-    // If already playing this message, stop it
     if (isPlaying) {
       audioPlayer.stop();
       return;
     }
 
-    // If loading, ignore
     if (isLoading) {
       return;
     }
 
     setIsLoading(true);
     try {
-      await audioPlayer.play(difyMessageId, difyMessageId);
+      await audioPlayer.play(messageId);
     } catch (error) {
-      // Silent error handling
+      // Playback is best effort
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Don't show button if no message ID
-  if (!difyMessageId) {
+  // No synthesize adapter, no button
+  if (!audioPlayer.canPlay) {
     return null;
   }
 

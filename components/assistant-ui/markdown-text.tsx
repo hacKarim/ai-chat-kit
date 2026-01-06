@@ -20,47 +20,23 @@ import type { Plugin } from "unified";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { cn } from "@/lib/utils";
 
-// Import social post components
-import { XPost, parseSerializableXPost } from "@/components/tool-ui/x-post";
-import { InstagramPost, parseSerializableInstagramPost } from "@/components/tool-ui/instagram-post";
-import { LinkedInPost, parseSerializableLinkedInPost } from "@/components/tool-ui/linkedin-post";
+import { BlockRenderer, BlockSkeleton } from "@/components/tool-ui/block-renderer";
+import { blockLanguages } from "@/components/tool-ui/registry";
 
-// Import tool-ui components
-import { DataTable, parseSerializableDataTable } from "@/components/tool-ui/data-table";
-import { OptionList, parseSerializableOptionList } from "@/components/tool-ui/option-list";
-import { ItemCarousel, parseSerializableItemCarousel } from "@/components/tool-ui/item-carousel";
-import { ItemDetail, parseSerializableItemDetail } from "@/components/tool-ui/item-detail";
-import { Chart, parseSerializableChart } from "@/components/tool-ui/chart";
-import { LinkPreview, parseSerializableLinkPreview } from "@/components/tool-ui/link-preview";
-import { Plan, parseSerializablePlan } from "@/components/tool-ui/plan";
-import { Image, parseSerializableImage } from "@/components/tool-ui/image";
-import { Maps, parseSerializableMaps } from "@/components/tool-ui/maps";
-import { Dashboard, parseSerializableDashboard } from "@/components/tool-ui/dashboard";
-import { FileDownload, parseSerializableFileDownload } from "@/components/tool-ui/file-download";
-import { RecordButton, parseSerializableRecordButton } from "@/components/tool-ui/record-button";
-import { NextBestAction, parseSerializableNextBestAction } from "@/components/tool-ui/next-best-action";
-
-// Remark plugin to transform social post code blocks
-const remarkSocialPosts: Plugin = () => {
+// Remark plugin: a fenced block whose language is a known block name
+// (```plan, ```chart, ...) becomes an <answer-block> element instead of code.
+const remarkAnswerBlocks: Plugin = () => {
   return (tree: any) => {
     visit(tree, "code", (node: any, index: number | undefined, parent: any) => {
       const language = node.lang;
-      const socialPostTypes = [
-        'x-post', 'x_post', 'twitter-post', 'twitter_post', 'instagram-post', 'instagram_post', 'linkedin-post', 'linkedin_post',
-        'data-table', 'data_table', 'option-list', 'option_list', 'detect', 'item-carousel', 'item_carousel', 'item-detail', 'item_detail',
-        'chart', 'chart_display', 'link-preview', 'link_preview', 'plan', 'image', 'maps', 'directions', 'dashboard', 'file-download', 'file_download',
-        'record-button', 'record_button', 'next-best-action', 'next_best_action', 'next-action', 'next_action', 'intent_detection', 'social_media',
-        'form'
-      ];
 
-      if (socialPostTypes.includes(language) && index !== undefined && parent) {
-        // Replace the code node with a custom HTML node
-        // Use btoa for browser compatibility instead of Buffer
+      if (blockLanguages.includes(language) && index !== undefined && parent) {
+        // btoa keeps the JSON intact through the HTML attribute
         const encodedContent = btoa(encodeURIComponent(node.value));
 
         parent.children[index] = {
-          type: 'html',
-          value: `<social-post-block data-type="${language}" data-content="${encodedContent}"></social-post-block>`,
+          type: "html",
+          value: `<answer-block data-type="${language}" data-content="${encodedContent}"></answer-block>`,
         };
       }
     });
@@ -73,29 +49,6 @@ const preprocessMarkdown = (text: string): string => {
   return text.replace(/\\`/g, '`');
 };
 
-// Attempt to fix common JSON syntax errors
-const sanitizeJSON = (jsonString: string): string => {
-  return jsonString
-    // Remove trailing commas before closing braces/brackets
-    .replace(/,(\s*[}\]])/g, '$1')
-    // Replace unescaped newlines in string values
-    .replace(/: *"([^"]*)\n([^"]*)"([,}\]])/g, (match, before, after, end) => {
-      return `: "${before}\\n${after}"${end}`;
-    })
-    // Remove any literal newlines within quoted strings (convert to \n)
-    .split('\n').map((line, i, arr) => {
-      // Check if we're inside a string by counting quotes
-      if (i === 0) return line;
-      const prevLines = arr.slice(0, i).join('\n');
-      const quoteCount = (prevLines.match(/"/g) || []).length;
-      const isInsideString = quoteCount % 2 !== 0;
-      if (isInsideString) {
-        return '\\n' + line;
-      }
-      return line;
-    }).join('');
-};
-
 const MarkdownTextImpl = ({ text }: { text?: string }) => {
   // If text prop is provided, use ReactMarkdown directly
   if (text !== undefined) {
@@ -103,7 +56,7 @@ const MarkdownTextImpl = ({ text }: { text?: string }) => {
     return (
       <div className="aui-md">
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkSocialPosts]}
+          remarkPlugins={[remarkGfm, remarkAnswerBlocks]}
           rehypePlugins={[rehypeRaw as any]}
           components={defaultComponents as any}
         >
@@ -116,7 +69,7 @@ const MarkdownTextImpl = ({ text }: { text?: string }) => {
   // Otherwise, get text from context using MarkdownTextPrimitive
   return (
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm, remarkSocialPosts]}
+      remarkPlugins={[remarkGfm, remarkAnswerBlocks]}
       rehypePlugins={[rehypeRaw]}
       className="aui-md"
       components={defaultComponents}
@@ -166,336 +119,52 @@ const useCopyToClipboard = ({
   return { isCopied, copyToClipboard };
 };
 
-// Wrapper component for OptionList that connects to the conversation
-const InteractiveOptionList: FC<{ data: any }> = ({ data }) => {
+// Connects a block to the conversation it was rendered in
+const ThreadBlock: FC<{ type: string; code: string }> = ({ type, code }) => {
   const threadRuntime = useThreadRuntime();
-  const optionList = parseSerializableOptionList(data);
-
-  const handleConfirm = (selection: string | string[]) => {
-    // Format the selection as a message
-    let message: string;
-    if (Array.isArray(selection)) {
-      // Multiple selections
-      const selectedOptions = optionList.options
-        .filter(opt => selection.includes(opt.id))
-        .map(opt => opt.label);
-      message = selectedOptions.join(", ");
-    } else {
-      // Single selection
-      const selectedOption = optionList.options.find(opt => opt.id === selection);
-      message = selectedOption?.label || selection;
-    }
-
-    // Send the message to the conversation
-    threadRuntime.append({
-      role: "user",
-      content: [{ type: "text", text: message }],
-    });
-  };
-
-  return <OptionList {...optionList} onConfirm={handleConfirm} />;
-};
-
-// Wrapper component for RecordButton that connects to the conversation
-const InteractiveRecordButton: FC<{ data: any }> = ({ data }) => {
-  const threadRuntime = useThreadRuntime();
-  const recordButton = parseSerializableRecordButton(data);
   const message = useMessage();
 
-  // Check if this is the last message in the thread
-  const thread = threadRuntime.getState();
-  const messages = thread.messages;
-  const currentMessageId = message?.id;
-  const currentMessageIndex = messages.findIndex((msg) => msg.id === currentMessageId);
-  const isLastMessage = currentMessageIndex === messages.length - 1;
+  const messages = threadRuntime.getState().messages;
+  const isLatest = messages[messages.length - 1]?.id === message?.id;
+  const isStreaming = message?.status?.type === "running";
 
-  const handleTranscript = (transcript: string) => {
-    // Send the transcript to the conversation
+  const send = (text: string) => {
     threadRuntime.append({
       role: "user",
-      content: [{ type: "text", text: transcript }],
+      content: [{ type: "text", text }],
     });
   };
 
-  return <RecordButton {...recordButton} onTranscript={handleTranscript} isActive={isLastMessage} />;
-};
-
-// Wrapper component for NextBestAction that connects to the conversation
-const InteractiveNextBestAction: FC<{ data: any }> = ({ data }) => {
-  const threadRuntime = useThreadRuntime();
-  const nextBestAction = parseSerializableNextBestAction(data);
-
-  const handleActionClick = (prompt: string) => {
-    // Send the prompt to the conversation
-    threadRuntime.append({
-      role: "user",
-      content: [{ type: "text", text: prompt }],
-    });
-  };
-
-  return <NextBestAction {...nextBestAction} onActionClick={handleActionClick} />;
-};
-
-// Wrapper component for ItemCarousel that connects to the conversation
-const InteractiveItemCarousel: FC<{ data: any }> = ({ data }) => {
-  const threadRuntime = useThreadRuntime();
-  const carousel = parseSerializableItemCarousel(data);
-
-  const handleItemClick = (itemId: string, itemName: string) => {
-    // Send the item name to the conversation
-    threadRuntime.append({
-      role: "user",
-      content: [{ type: "text", text: itemName }],
-    });
-  };
-
-  const handleActionClick = (prompt: string) => {
-    // Send the prompt to the conversation
-    threadRuntime.append({
-      role: "user",
-      content: [{ type: "text", text: prompt }],
-    });
-  };
-
-  return <ItemCarousel {...carousel} onItemClick={handleItemClick} onActionClick={handleActionClick} />;
+  return (
+    <BlockRenderer
+      type={type}
+      code={code}
+      send={send}
+      isLatest={isLatest}
+      // Half-written JSON while the answer streams: hold the space
+      fallback={isStreaming ? <BlockSkeleton className="my-4" /> : null}
+    />
+  );
 };
 
 const defaultComponents = memoizeMarkdownComponents({
-  // Custom renderer for social post blocks
-  // @ts-ignore - custom HTML element from remark plugin
-  "social-post-block": function SocialPostBlockRenderer(props: any) {
-    const type = props['data-type'];
-    const encodedContent = props['data-content'];
+  // @ts-expect-error - custom HTML element from the remark plugin
+  "answer-block": function AnswerBlock(props: any) {
+    const type = props["data-type"];
+    const encodedContent = props["data-content"];
 
     if (!type || !encodedContent) {
       return null;
     }
 
+    let code: string;
     try {
-      // Decode the content
-      const content = decodeURIComponent(atob(encodedContent));
-
-      let data;
-      try {
-        data = JSON.parse(content);
-      } catch (parseError) {
-        // Try to sanitize and fix common JSON issues
-        try {
-          const sanitizedContent = sanitizeJSON(content);
-          data = JSON.parse(sanitizedContent);
-        } catch (secondError) {
-          // Silently fail - return null so component doesn't render
-          return null;
-        }
-      }
-
-      // Render based on type
-      switch (type) {
-        case 'x-post':
-        case 'x_post':
-        case 'twitter-post':
-        case 'twitter_post':
-          const xPost = parseSerializableXPost(data);
-          return (
-            <div className="not-prose my-4">
-              <XPost post={xPost} />
-            </div>
-          );
-
-        case 'instagram-post':
-        case 'instagram_post':
-          const igPost = parseSerializableInstagramPost(data);
-          return (
-            <div className="not-prose my-4">
-              <InstagramPost post={igPost} />
-            </div>
-          );
-
-        case 'linkedin-post':
-        case 'linkedin_post':
-          const liPost = parseSerializableLinkedInPost(data);
-          return (
-            <div className="not-prose my-4">
-              <LinkedInPost post={liPost} />
-            </div>
-          );
-
-        case 'social_media':
-          // Transform social_media format to platform-specific format
-          const platform = data.platform?.toLowerCase();
-          const transformedData = {
-            id: data.id || crypto.randomUUID(),
-            author: data.author || {
-              name: "Acme",
-              handle: data.platform === 'instagram' ? '@acme' : 'acme',
-              avatarUrl: '',
-              verified: true
-            },
-            text: data.caption || data.text || '',
-            media: data.elements?.image_concept ? [{ type: 'image', url: '', alt: data.elements.image_concept }] : undefined,
-            stats: data.stats,
-            createdAt: data.createdAt || new Date().toISOString()
-          };
-
-          // Route to appropriate platform component
-          if (platform === 'instagram') {
-            const igPostFromSM = parseSerializableInstagramPost(transformedData);
-            return (
-              <div className="not-prose my-4">
-                <InstagramPost post={igPostFromSM} />
-              </div>
-            );
-          } else if (platform === 'linkedin') {
-            const liPostFromSM = parseSerializableLinkedInPost(transformedData);
-            return (
-              <div className="not-prose my-4">
-                <LinkedInPost post={liPostFromSM} />
-              </div>
-            );
-          } else if (platform === 'twitter' || platform === 'x') {
-            const xPostFromSM = parseSerializableXPost(transformedData);
-            return (
-              <div className="not-prose my-4">
-                <XPost post={xPostFromSM} />
-              </div>
-            );
-          }
-          // Default to Instagram if platform not specified
-          const defaultPost = parseSerializableInstagramPost(transformedData);
-          return (
-            <div className="not-prose my-4">
-              <InstagramPost post={defaultPost} />
-            </div>
-          );
-
-        case 'data-table':
-        case 'data_table':
-          const dataTable = parseSerializableDataTable(data);
-          return (
-            <div className="not-prose my-4">
-              <DataTable {...dataTable} />
-            </div>
-          );
-
-        case 'option-list':
-        case 'option_list':
-        case 'detect':
-          return (
-            <div className="not-prose my-4">
-              <InteractiveOptionList data={data} />
-            </div>
-          );
-
-        case 'item-carousel':
-        case 'item_carousel':
-          return (
-            <div className="not-prose my-4">
-              <InteractiveItemCarousel data={data} />
-            </div>
-          );
-
-        case 'item-detail':
-        case 'item_detail':
-          const itemDetail = parseSerializableItemDetail(data);
-          return (
-            <div className="not-prose my-4">
-              <ItemDetail {...itemDetail} />
-            </div>
-          );
-
-        case 'chart':
-        case 'chart_display':
-          const chart = parseSerializableChart(data);
-          return (
-            <div className="not-prose my-4">
-              <Chart {...chart} />
-            </div>
-          );
-
-        case 'link-preview':
-        case 'link_preview':
-          const linkPreview = parseSerializableLinkPreview(data);
-          return (
-            <div className="not-prose my-4">
-              <LinkPreview {...linkPreview} />
-            </div>
-          );
-
-        case 'plan':
-          const plan = parseSerializablePlan(data);
-          return (
-            <div className="not-prose my-4">
-              <Plan {...plan} />
-            </div>
-          );
-
-        case 'image':
-          const image = parseSerializableImage(data);
-          return (
-            <div className="not-prose my-4">
-              <Image {...image} />
-            </div>
-          );
-
-        case 'maps':
-          const maps = parseSerializableMaps(data);
-          return (
-            <div className="not-prose my-4">
-              <Maps {...maps} />
-            </div>
-          );
-
-        case 'dashboard':
-          const dashboard = parseSerializableDashboard(data);
-          return (
-            <div className="not-prose my-4">
-              <Dashboard {...dashboard} />
-            </div>
-          );
-
-        case 'file-download':
-        case 'file_download':
-          const fileDownload = parseSerializableFileDownload(data);
-          return (
-            <div className="not-prose my-4">
-              <FileDownload {...fileDownload} />
-            </div>
-          );
-
-        case 'record-button':
-        case 'record_button':
-          return (
-            <div className="not-prose my-4">
-              <InteractiveRecordButton data={data} />
-            </div>
-          );
-
-        case 'next-best-action':
-        case 'next_best_action':
-        case 'next-action':
-        case 'next_action':
-          return (
-            <div className="not-prose my-4">
-              <InteractiveNextBestAction data={data} />
-            </div>
-          );
-
-        case 'intent_detection':
-          // Silent component - metadata only, don't render
-          return null;
-
-        case 'directions':
-          // Silent component - metadata only, don't render
-          // The actual directions are shown via the maps component
-          return null;
-
-        default:
-          return null;
-      }
-    } catch (error) {
-      // Silently fail
+      code = decodeURIComponent(atob(encodedContent));
+    } catch {
       return null;
     }
+
+    return <ThreadBlock type={type} code={code} />;
   },
   h1: ({ className, ...props }) => (
     <h1

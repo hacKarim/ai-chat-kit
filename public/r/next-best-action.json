@@ -1,0 +1,30 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "next-best-action",
+  "title": "Next best action",
+  "description": "The next best action block: component, parser and types.",
+  "dependencies": [
+    "lucide-react"
+  ],
+  "registryDependencies": [
+    "button"
+  ],
+  "files": [
+    {
+      "path": "components/tool-ui/next-best-action/index.ts",
+      "content": "export { NextBestAction } from \"./next-best-action\";\nexport type { SerializableNextBestAction, ActionButton } from \"./schema\";\nexport { parseSerializableNextBestAction } from \"./schema\";\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/next-best-action/next-best-action.tsx",
+      "content": "\"use client\";\n\nimport { FC } from \"react\";\nimport { ChevronRight } from \"lucide-react\";\nimport { cn } from \"@/lib/utils\";\nimport { Button } from \"@/components/ui/button\";\nimport type { SerializableNextBestAction } from \"./schema\";\n\ninterface NextBestActionProps extends SerializableNextBestAction {\n  className?: string;\n  onActionClick?: (prompt: string) => void;\n}\n\nexport const NextBestAction: FC<NextBestActionProps> = ({\n  id,\n  title,\n  description,\n  actions,\n  className,\n  onActionClick,\n}) => {\n  const handleActionClick = (prompt: string) => {\n    if (onActionClick) {\n      onActionClick(prompt);\n    }\n  };\n\n  return (\n    <div\n      className={cn(\"w-full max-w-2xl space-y-4\", className)}\n      data-tool-ui-id={id}\n      data-slot=\"next-best-action\"\n    >\n      {(title || description) && (\n        <div className=\"space-y-1\">\n          {title && (\n            <h3 className=\"text-lg font-semibold\">{title}</h3>\n          )}\n          {description && (\n            <p className=\"text-sm text-muted-foreground\">{description}</p>\n          )}\n        </div>\n      )}\n\n      <div className=\"flex flex-col md:flex-row md:flex-wrap gap-3\">\n        {actions.map((action) => (\n          <Button\n            key={action.id}\n            variant={action.variant || \"secondary\"}\n            onClick={() => handleActionClick(action.prompt)}\n            className={cn(\n              \"h-auto w-full md:flex-1 flex-row items-center justify-between gap-4 p-4 text-left cursor-pointer\",\n              \"hover:scale-[1.01] transition-transform\"\n            )}\n          >\n            <div className=\"flex flex-col items-start gap-2\">\n              <span className=\"font-semibold text-base\">{action.label}</span>\n              {action.description && (\n                <span className=\"text-xs font-normal text-muted-foreground whitespace-normal hidden\">\n                  {action.description}\n                </span>\n              )}\n            </div>\n            <ChevronRight className=\"h-5 w-5 flex-shrink-0\" />\n          </Button>\n        ))}\n      </div>\n    </div>\n  );\n};\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/next-best-action/schema.ts",
+      "content": "export interface ActionButton {\n  id: string;\n  label: string;\n  description?: string;\n  prompt: string; // The message to send when clicked\n  variant?: \"default\" | \"secondary\" | \"outline\";\n}\n\nexport interface SerializableNextBestAction {\n  id: string;\n  title?: string;\n  description?: string;\n  actions: ActionButton[]; // Max 3 buttons\n}\n\nexport function parseSerializableNextBestAction(data: any): SerializableNextBestAction {\n  // Map variant values\n  const mapVariant = (variant: string): ActionButton[\"variant\"] => {\n    switch (variant) {\n      case \"primary\":\n        return \"default\";\n      case \"default\":\n      case \"secondary\":\n      case \"outline\":\n        return variant;\n      default:\n        return \"default\";\n    }\n  };\n\n  // Helper to extract prompt from action\n  const extractPrompt = (action: any): string => {\n    // Try various locations for the prompt\n    if (action.prompt) return action.prompt;\n    if (action.action) return action.action; // Handle \"action\" field\n    if (action.payload?.question) return action.payload.question;\n    if (action.payload?.topic) return action.payload.topic;\n    if (action.payload?.message) return action.payload.message;\n    return action.label; // Fallback to label\n  };\n\n  // Auto-generate IDs for actions if not provided (max 3)\n  // Support multiple formats: actions, options, primaryAction+secondaryActions\n  let actionsData = data.actions || data.options;\n\n  // Handle primaryAction + secondaryActions format\n  if (!actionsData && (data.primaryAction || data.secondaryActions)) {\n    actionsData = [\n      ...(data.primaryAction ? [data.primaryAction] : []),\n      ...(data.secondaryActions || [])\n    ];\n  }\n\n  const actions = Array.isArray(actionsData)\n    ? actionsData.slice(0, 3).map((action: any) => ({\n        id: action.id || crypto.randomUUID(),\n        label: action.label,\n        description: action.description,\n        // Extract prompt from various possible locations\n        prompt: extractPrompt(action),\n        // Map variant from type, actionType, variant, or style field\n        variant: mapVariant(action.variant || action.type || action.actionType || action.style),\n      }))\n    : [];\n\n  return {\n    id: data.id || crypto.randomUUID(),\n    title: data.title,\n    description: data.description,\n    actions,\n  };\n}\n",
+      "type": "registry:component"
+    }
+  ],
+  "type": "registry:block"
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "link-preview",
+  "title": "Link preview",
+  "description": "The link preview block: component, parser and types.",
+  "dependencies": [
+    "lucide-react"
+  ],
+  "registryDependencies": [
+    "button"
+  ],
+  "files": [
+    {
+      "path": "components/tool-ui/link-preview/index.ts",
+      "content": "export { LinkPreview } from \"./link-preview\";\nexport { parseSerializableLinkPreview } from \"./schema\";\nexport type { SerializableLinkPreview } from \"./schema\";\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/link-preview/link-preview.tsx",
+      "content": "\"use client\";\n\nimport { FC } from \"react\";\nimport { cn } from \"@/lib/utils\";\nimport { ExternalLink } from \"lucide-react\";\nimport { ActionButtons } from \"@/components/tool-ui/shared/action-buttons\";\nimport { RATIO_CLASS_MAP, getFitClass } from \"@/components/tool-ui/shared/media\";\nimport type { SerializableLinkPreview } from \"./schema\";\n\ninterface LinkPreviewProps extends SerializableLinkPreview {\n  className?: string;\n  onResponseAction?: (actionId: string) => void;\n}\n\nexport const LinkPreview: FC<LinkPreviewProps> = ({\n  id,\n  href,\n  title,\n  description,\n  image,\n  domain,\n  favicon,\n  ratio = \"16:9\",\n  createdAt,\n  responseActions,\n  className,\n  onResponseAction,\n}) => {\n  return (\n    <div\n      className={cn(\"flex flex-col gap-3\", className)}\n      data-tool-ui-id={id}\n      data-slot=\"link-preview\"\n    >\n      <a\n        href={href}\n        target=\"_blank\"\n        rel=\"noopener noreferrer\"\n        className=\"bg-card text-card-foreground border shadow-none group block rounded-xl overflow-hidden hover:shadow-none transition-all\"\n      >\n        {/* Preview Image */}\n        {image && (\n          <div className={cn(\"relative overflow-hidden bg-muted\", RATIO_CLASS_MAP[ratio])}>\n            <img\n              src={image}\n              alt={title || \"Link preview\"}\n              className={cn(\"w-full h-full object-cover transition-transform duration-300 group-hover:scale-105\", getFitClass(\"cover\"))}\n              loading=\"lazy\"\n            />\n          </div>\n        )}\n\n        {/* Content */}\n        <div className=\"p-4 space-y-2\">\n          {/* Domain with favicon */}\n          <div className=\"flex items-center gap-2 text-xs text-muted-foreground\">\n            {favicon && (\n              <img src={favicon} alt=\"\" className=\"w-4 h-4 rounded\" />\n            )}\n            <span>{domain || new URL(href).hostname}</span>\n            <ExternalLink className=\"w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity\" />\n          </div>\n\n          {/* Title */}\n          {title && (\n            <h3 className=\"font-semibold text-base leading-snug line-clamp-2 group-hover:text-primary transition-colors\">\n              {title}\n            </h3>\n          )}\n\n          {/* Description */}\n          {description && (\n            <p className=\"text-sm text-muted-foreground line-clamp-2\">\n              {description}\n            </p>\n          )}\n\n          {/* Created At */}\n          {createdAt && (\n            <time className=\"text-xs text-muted-foreground block\">\n              {new Date(createdAt).toLocaleDateString(undefined, {\n                year: 'numeric',\n                month: 'long',\n                day: 'numeric'\n              })}\n            </time>\n          )}\n        </div>\n      </a>\n\n      {/* Response Actions */}\n      {responseActions && responseActions.length > 0 && (\n        <ActionButtons\n          actions={responseActions}\n          onAction={onResponseAction}\n        />\n      )}\n    </div>\n  );\n};\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/link-preview/schema.ts",
+      "content": "import type { Action } from \"../shared/schema\";\n\nexport interface SerializableLinkPreview {\n  id: string;\n  href: string;\n  title?: string;\n  description?: string;\n  image?: string;\n  domain?: string;\n  favicon?: string;\n  ratio?: \"auto\" | \"1:1\" | \"4:3\" | \"16:9\" | \"9:16\";\n  createdAt?: string;\n  responseActions?: Action[];\n}\n\nexport function parseSerializableLinkPreview(data: any): SerializableLinkPreview {\n  return {\n    id: data.id || crypto.randomUUID(),\n    href: data.href || \"\",\n    title: data.title,\n    description: data.description,\n    image: data.image,\n    domain: data.domain,\n    favicon: data.favicon,\n    ratio: data.ratio || \"16:9\",\n    createdAt: data.createdAt,\n    responseActions: data.responseActions,\n  };\n}\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/shared/action-buttons.tsx",
+      "content": "\"use client\";\n\nimport { FC } from \"react\";\nimport { Button } from \"@/components/ui/button\";\nimport type { Action } from \"./schema\";\n\ninterface ActionButtonsProps {\n  actions?: Action[];\n  onAction?: (actionId: string) => void;\n  className?: string;\n}\n\nexport const ActionButtons: FC<ActionButtonsProps> = ({\n  actions,\n  onAction,\n  className,\n}) => {\n  if (!actions || actions.length === 0) return null;\n\n  return (\n    <div className={`flex flex-wrap gap-2 ${className || \"\"}`}>\n      {actions.map((action) => (\n        <Button\n          key={action.id}\n          variant={action.variant || \"outline\"}\n          size=\"sm\"\n          disabled={action.disabled}\n          onClick={() => onAction?.(action.id)}\n          className=\"text-xs\"\n        >\n          {action.label}\n        </Button>\n      ))}\n    </div>\n  );\n};\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/shared/media.tsx",
+      "content": "export const RATIO_CLASS_MAP = {\n  auto: \"aspect-auto\",\n  \"1:1\": \"aspect-square\",\n  \"4:3\": \"aspect-[4/3]\",\n  \"16:9\": \"aspect-video\",\n  \"9:16\": \"aspect-[9/16]\",\n} as const;\n\nexport function getFitClass(fit: \"cover\" | \"contain\" = \"cover\") {\n  return fit === \"cover\" ? \"object-cover\" : \"object-contain\";\n}\n\nexport const OVERLAY_GRADIENT =\n  \"bg-gradient-to-t from-black/60 via-black/20 to-transparent\";\n\nexport function sanitizeHref(href: string | undefined): string | undefined {\n  if (!href) return undefined;\n  try {\n    const url = new URL(href);\n    if (url.protocol === \"javascript:\") return undefined;\n    return href;\n  } catch {\n    return undefined;\n  }\n}\n",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/tool-ui/shared/schema.ts",
+      "content": "/**\n * Shared types for social post components\n */\n\nexport interface Action {\n  id: string;\n  label: string;\n  prompt?: string; // The message to send when clicked\n  variant?: \"default\" | \"destructive\" | \"outline\" | \"secondary\" | \"ghost\" | \"link\";\n  disabled?: boolean;\n}\n\nexport interface BaseAuthor {\n  name: string;\n  avatarUrl: string;\n}\n\nexport interface MediaItem {\n  type: \"image\" | \"video\";\n  url: string;\n  alt?: string;\n  aspectRatio?: number;\n}\n\nexport interface LinkPreview {\n  url: string;\n  title?: string;\n  description?: string;\n  imageUrl?: string;\n  domain?: string;\n}\n\nexport interface BaseStats {\n  likes?: number;\n  shares?: number;\n  comments?: number;\n}\n",
+      "type": "registry:component"
+    }
+  ],
+  "type": "registry:block"
+}

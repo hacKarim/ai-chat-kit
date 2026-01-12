@@ -1,0 +1,1089 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "ai-chat-kit",
+  "homepage": "https://hackarim.github.io/ai-chat-kit",
+  "items": [
+    {
+      "name": "chart",
+      "type": "registry:block",
+      "title": "Chart",
+      "description": "The chart block: component, parser and types.",
+      "dependencies": [
+        "recharts"
+      ],
+      "registryDependencies": [
+        "chart"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/chart/chart.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "dashboard",
+      "type": "registry:block",
+      "title": "Dashboard",
+      "description": "The dashboard block: component, parser and types.",
+      "dependencies": [
+        "lucide-react",
+        "recharts"
+      ],
+      "registryDependencies": [
+        "chart",
+        "progress"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/chart/chart.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/dashboard.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "data-table",
+      "type": "registry:block",
+      "title": "Data table",
+      "description": "The data table block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "accordion",
+        "table"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/data-table/data-table.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "file-download",
+      "type": "registry:block",
+      "title": "File download",
+      "description": "The file download block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "components/tool-ui/file-download/file-download.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "image",
+      "type": "registry:block",
+      "title": "Image",
+      "description": "The image block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "dialog",
+        "visually-hidden"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/image/image.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/media.tsx",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "instagram-post",
+      "type": "registry:block",
+      "title": "Instagram post",
+      "description": "The instagram post block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "avatar",
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/instagram-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/instagram-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "item-carousel",
+      "type": "registry:block",
+      "title": "Item carousel",
+      "description": "The item carousel block: component, parser and types.",
+      "dependencies": [],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/item-carousel/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/item-carousel.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "item-detail",
+      "type": "registry:block",
+      "title": "Item detail",
+      "description": "The item detail block: component, parser and types.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "components/tool-ui/item-detail/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/item-detail.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "link-preview",
+      "type": "registry:block",
+      "title": "Link preview",
+      "description": "The link preview block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/link-preview/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/link-preview.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/media.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "linkedin-post",
+      "type": "registry:block",
+      "title": "Linkedin post",
+      "description": "The linkedin post block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "avatar",
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/linkedin-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/linkedin-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "maps",
+      "type": "registry:block",
+      "title": "Maps",
+      "description": "The maps block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/maps/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/maps.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/media.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "next-best-action",
+      "type": "registry:block",
+      "title": "Next best action",
+      "description": "The next best action block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/next-best-action/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/next-best-action.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "option-list",
+      "type": "registry:block",
+      "title": "Option list",
+      "description": "The option list block: component, parser and types.",
+      "dependencies": [],
+      "registryDependencies": [
+        "button",
+        "checkbox",
+        "label",
+        "radio-group"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/option-list/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/option-list.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "plan",
+      "type": "registry:block",
+      "title": "Plan",
+      "description": "The plan block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button",
+        "progress"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/plan/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/plan.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/schema.ts",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "record-button",
+      "type": "registry:block",
+      "title": "Record button",
+      "description": "The record button block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button",
+        "card"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/record-button/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/record-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "contexts/voice-recorder-context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "hooks/use-voice-recorder.ts",
+          "type": "registry:hook"
+        },
+        {
+          "path": "lib/chat-kit.tsx",
+          "type": "registry:lib"
+        }
+      ]
+    },
+    {
+      "name": "x-post",
+      "type": "registry:block",
+      "title": "X post",
+      "description": "The x post block: component, parser and types.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "avatar",
+        "button"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/x-post.tsx",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
+      "name": "block-renderer",
+      "type": "registry:block",
+      "title": "Block renderer",
+      "description": "All blocks, the registry and the renderer that turns a fenced block into a component.",
+      "dependencies": [
+        "lucide-react",
+        "recharts"
+      ],
+      "registryDependencies": [
+        "accordion",
+        "avatar",
+        "button",
+        "card",
+        "chart",
+        "checkbox",
+        "dialog",
+        "label",
+        "progress",
+        "radio-group",
+        "table",
+        "visually-hidden"
+      ],
+      "files": [
+        {
+          "path": "components/tool-ui/block-renderer.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/chart.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/dashboard.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/data-table.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/file-download.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/image.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/instagram-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/item-carousel.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/item-detail.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/link-preview.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/linkedin-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/maps.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/next-best-action.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/option-list.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/plan.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/record-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/registry.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/media.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/x-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "contexts/voice-recorder-context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "hooks/use-voice-recorder.ts",
+          "type": "registry:hook"
+        },
+        {
+          "path": "lib/chat-kit.tsx",
+          "type": "registry:lib"
+        }
+      ]
+    },
+    {
+      "name": "chat-thread",
+      "type": "registry:block",
+      "title": "Chat thread",
+      "description": "The full thread: messages, composer, Markdown with blocks, reasoning, sources, workflow status and voice.",
+      "dependencies": [
+        "@assistant-ui/react",
+        "@assistant-ui/react-markdown",
+        "@radix-ui/react-slot",
+        "lucide-react",
+        "motion",
+        "react-markdown",
+        "recharts",
+        "rehype-raw",
+        "remark-gfm",
+        "three",
+        "unified",
+        "unist-util-visit",
+        "zustand"
+      ],
+      "registryDependencies": [
+        "accordion",
+        "avatar",
+        "badge",
+        "button",
+        "card",
+        "chart",
+        "checkbox",
+        "collapsible",
+        "dialog",
+        "label",
+        "popover",
+        "progress",
+        "radio-group",
+        "sheet",
+        "table",
+        "tooltip",
+        "visually-hidden"
+      ],
+      "files": [
+        {
+          "path": "components/assistant-ui/attachment.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/markdown-text.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/message-sources.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/reasoning.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/text-with-images.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/thread.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/tool-fallback.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/tooltip-icon-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/voice-modal.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/assistant-ui/voice-recorder.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/block-renderer.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/chart.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/chart/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/dashboard.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/dashboard/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/data-table.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/data-table/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/file-download.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/file-download/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/image.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/image/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/instagram-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/instagram-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/item-carousel.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-carousel/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/item-detail.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/item-detail/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/link-preview.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/link-preview/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/linkedin-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/linkedin-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/maps.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/maps/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/next-best-action.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/next-best-action/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/option-list.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/option-list/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/plan.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/plan/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/record-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/record-button/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/registry.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/action-buttons.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/media.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/shared/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/schema.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/tool-ui/x-post/x-post.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/ui/text-animate.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "components/workflow-status.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "contexts/voice-recorder-context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "hooks/use-voice-recorder.ts",
+          "type": "registry:hook"
+        },
+        {
+          "path": "lib/chat-kit.tsx",
+          "type": "registry:lib"
+        },
+        {
+          "path": "lib/types.ts",
+          "type": "registry:lib"
+        }
+      ]
+    }
+  ]
+}

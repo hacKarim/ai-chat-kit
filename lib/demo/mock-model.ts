@@ -28,7 +28,7 @@ const replies: Reply[] = [
     suggestions: ["Plan the fix", "Draft a post about it", "Show release health"],
   },
   {
-    match: /plan|migrat|steps|fix/i,
+    match: /plan|migrat|steps/i,
     before: "Here is the plan. Every step can be rolled back until the last one.",
     blocks: ["plan"],
     suggestions: ["Which region should we use?", "Show release health"],
